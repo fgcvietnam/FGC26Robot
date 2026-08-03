@@ -51,18 +51,14 @@ internal class Flywheel(hardwareMap: HardwareMap) {
 
     fun update(): FlywheelTelemetry {
         val commandedRpm = if (enabled) targetRpm else 0.0
-        val targetVelocity =
-            FlywheelConfig.rpmToTicksPerSecond(commandedRpm)
+        val targetVelocity = FlywheelConfig.rpmToTicksPerSecond(commandedRpm)
         primaryMotor.velocity = targetVelocity
         secondaryMotor.velocity = targetVelocity
 
         val primaryState = motorTelemetry(primaryMotor)
         val secondaryState = motorTelemetry(secondaryMotor)
         val shaftRpm = (primaryState.rpm + secondaryState.rpm) / 2.0
-        val allowedErrorRpm = max(
-            MIN_READY_ERROR_RPM,
-            targetRpm * READY_ERROR_RATIO,
-        )
+        val allowedErrorRpm = max(MIN_READY_ERROR_RPM, targetRpm * READY_ERROR_RATIO)
 
         return FlywheelTelemetry(
             enabled = enabled,
@@ -75,8 +71,7 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             secondaryMotor = secondaryState,
             shaftRpm = shaftRpm,
             rpmDifference = abs(primaryState.rpm - secondaryState.rpm),
-            surfaceSpeedMetersPerSecond =
-                FlywheelConfig.rpmToSurfaceSpeedMetersPerSecond(shaftRpm),
+            surfaceSpeedMetersPerSecond = FlywheelConfig.rpmToSurfaceSpeedMetersPerSecond(shaftRpm),
         )
     }
 
@@ -86,16 +81,14 @@ internal class Flywheel(hardwareMap: HardwareMap) {
         secondaryMotor.velocity = 0.0
     }
 
-    private fun motorTelemetry(motor: DcMotorEx): FlywheelMotorTelemetry {
-        val velocity = motor.velocity
-        return FlywheelMotorTelemetry(
-            rpm = FlywheelConfig.ticksPerSecondToRpm(velocity),
-            velocity = velocity,
+    private fun motorTelemetry(motor: DcMotorEx): FlywheelMotorTelemetry =
+        FlywheelMotorTelemetry(
+            rpm = FlywheelConfig.ticksPerSecondToRpm(motor.velocity),
+            velocity = motor.velocity,
             currentAmps = motor.getCurrent(CurrentUnit.AMPS),
             encoderPosition = motor.currentPosition,
             motorPower = motor.power,
         )
-    }
 
     private fun motor(
         hardwareMap: HardwareMap,
@@ -113,7 +106,6 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             FlywheelConfig.PIDF_F,
         )
         setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf)
-
         power = 0.0
     }
 

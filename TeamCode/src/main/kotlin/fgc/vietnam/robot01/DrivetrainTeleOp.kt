@@ -25,6 +25,7 @@ abstract class SharedDriveTeleOp protected constructor(
     private var previousFlywheelToggle = false
     private var previousHexToggle = false
     private var previousDatalogToggle = false
+    private var previousIntakeToggle = false
 
     override fun init() {
         drivetrain = Drivetrain(hardwareMap)
@@ -34,9 +35,9 @@ abstract class SharedDriveTeleOp protected constructor(
         telemetry.addData(
             "Status",
             if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
-                "A heading hold | B flywheel | LT/RT Intake | X hex toggle | D-pad L/R Servos | Start+Y datalog"
+                "A heading hold | B flywheel | LT Intake toggle | LB Outtake hold | RT Hex reverse | D-pad L/R Servos | Start+Y datalog"
             } else {
-                "Tank: sticks Y | B flywheel | LT/RT Intake | X hex toggle | D-pad L/R Servos"
+                "Tank: sticks Y | B flywheel | LT Intake toggle | LB Outtake hold | RT Hex reverse | D-pad L/R Servos"
             },
         )
     }
@@ -117,18 +118,21 @@ abstract class SharedDriveTeleOp protected constructor(
             }
         }
 
-        // Reversed Intake controls on Triggers (and Bumpers as fallback)
-        // LT/LB = Intake, RT/RB = Outtake
-        val intakeInput = g1.left_trigger > 0.1 || g2.left_trigger > 0.1 || g1.left_bumper || g2.left_bumper
-        val outtakeInput = g1.right_trigger > 0.1 || g2.right_trigger > 0.1 || g1.right_bumper || g2.right_bumper
+        // Intake controls:
+        // LT = Toggle Intake (ON/OFF)
+        // LB = Hold Outtake (momentary override)
+        // RT = Hold Hex Motor Reverse (momentary reverse while active)
+        val intakeToggleInput = g1.left_trigger > 0.1 || g2.left_trigger > 0.1
+        val outtakeHoldInput = g1.left_bumper || g2.left_bumper
+        val hexReverseHoldInput = g1.right_trigger > 0.1 || g2.right_trigger > 0.1
 
-        if (intakeInput) {
-            intake.startIntake()
-        } else if (outtakeInput) {
-            intake.startOuttake()
-        } else {
-            intake.stopMotor()
+        if (intakeToggleInput && !previousIntakeToggle) {
+            intake.toggleIntake()
         }
+        previousIntakeToggle = intakeToggleInput
+
+        intake.setOuttakeHeld(outtakeHoldInput)
+        intake.setHexReverseHeld(hexReverseHoldInput)
 
         val servoBwd = g1.dpad_left || g2.dpad_left
         val servoFwd = g1.dpad_right || g2.dpad_right
@@ -223,7 +227,8 @@ abstract class SharedDriveTeleOp protected constructor(
         )
         telemetry.addData(
             "Intake",
-            "hex=%s",
+            "state=%s hex=%s",
+            intake.state,
             if (intake.hexReversed) "OPPOSITE" else "SAME",
         )
         if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {

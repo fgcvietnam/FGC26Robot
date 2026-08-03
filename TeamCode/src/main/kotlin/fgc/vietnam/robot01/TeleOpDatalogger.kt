@@ -2,25 +2,7 @@ package fgc.vietnam.robot01
 
 import com.qualcomm.robotcore.hardware.Gamepad
 
-/**
- * Full-robot TeleOp CSV datalogger — 104 columns per row.
- *
- * Column groups:
- *   - Timing      : elapsed_sec, loop_delta_ms, absolute_timestamp_ms, row_index
- *   - Gamepad 1   : 6 axes + 14 buttons
- *   - Gamepad 2   : 6 axes + 14 buttons
- *   - Hub temps   : Control Hub & Extension Hub chip temperature (°C)
- *   - Drive       : inputs, full heading PID, velocities, velocity errors,
- *                   individual wheel speeds, encoder positions,
- *                   motor powers, currents, yaw/pitch/roll + rates,
- *                   heading angular acceleration, battery voltage
- *   - Flywheel    : summary + per-motor RPM, RPM error, velocity,
- *                   current, encoder position, duty-cycle power
- *   - Intake      : hex-mode flag, motor/servo commanded powers
- *
- * Toggle with toggleLogging().  Flushed every 25 rows; closed on stop().
- * File → /sdcard/FIRST/Datalogs/teleop_full_<timestamp>.csv
- */
+// Full robot teleop CSV datalogger (104 columns).
 internal class TeleOpDatalogger {
 
     private var logger: Datalogger? = null
