@@ -4,11 +4,16 @@ buildscript {
     repositories {
         mavenCentral()
         google()
+        maven {
+            url "https://repo.dairy.foundation/releases"
+        }
     }
 
     dependencies {
+        //noinspection AndroidGradlePluginVersion
         classpath 'com.android.tools.build:gradle:8.7.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        classpath "dev.frozenmilk:Load:0.2.4"
     }
 }
 

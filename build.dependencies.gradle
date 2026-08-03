@@ -1,4 +1,12 @@
 def sdkVersion = rootProject.ext.ftcSdkVersion
+repositories {
+    maven {
+        url = 'https://maven.brott.dev/'
+    }
+    maven {
+        url = "https://repo.dairy.foundation/releases"
+    }
+}
 
 dependencies {
     implementation "org.firstinspires.ftc:Inspection:$sdkVersion"
@@ -10,4 +18,14 @@ dependencies {
     implementation "org.firstinspires.ftc:FtcCommon:$sdkVersion"
     implementation "org.firstinspires.ftc:Vision:$sdkVersion"
     implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation("com.acmerobotics.roadrunner:ftc:0.1.25") {
+        exclude group: "com.acmerobotics.dashboard"
+    }
+    implementation ("com.acmerobotics.roadrunner:actions:1.0.1"){
+        exclude group: "com.acmerobotics.dashboard"
+    }
+    implementation "com.acmerobotics.roadrunner:core:1.0.1"
+    implementation("com.acmerobotics.slothboard:dashboard:0.2.4+0.5.1")
+    implementation("dev.frozenmilk.sinister:Sloth:0.2.4")
+
 }
