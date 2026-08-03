@@ -1,11 +1,14 @@
 package fgc.vietnam.robot01
 
+import com.qualcomm.hardware.lynx.LynxModule
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import org.firstinspires.ftc.robotcore.external.navigation.TempUnit
 import kotlin.math.abs
 
 enum class DriveControlMode {
     ARCADE,
+    SPLIT_ARCADE,
     TANK,
 }
 
@@ -14,29 +17,37 @@ abstract class SharedDriveTeleOp protected constructor(
 ) : OpMode() {
     private lateinit var drivetrain: Drivetrain
     private lateinit var flywheel: Flywheel
+    private lateinit var intake: Intake
+    private lateinit var lynxModules: List<LynxModule>
+    private val datalogger = TeleOpDatalogger()
 
     private var previousHeadingToggle = false
     private var previousFlywheelToggle = false
-    private var previousFlywheelIncrease = false
-    private var previousFlywheelDecrease = false
+    private var previousHexToggle = false
+    private var previousDatalogToggle = false
 
     override fun init() {
         drivetrain = Drivetrain(hardwareMap)
         flywheel = Flywheel(hardwareMap)
+        intake = Intake(hardwareMap)
+        lynxModules = hardwareMap.getAll(LynxModule::class.java)
         telemetry.addData(
             "Status",
-            if (controlMode == DriveControlMode.ARCADE) {
-                "A heading hold | B flywheel | D-pad Up/Down RPM"
+            if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
+                "A heading hold | B flywheel | LT/RT Intake | X hex toggle | D-pad L/R Servos | Start+Y datalog"
             } else {
-                "Tank: sticks Y | B flywheel | D-pad Up/Down RPM"
+                "Tank: sticks Y | B flywheel | LT/RT Intake | X hex toggle | D-pad L/R Servos"
             },
         )
     }
 
     override fun loop() {
-        val headingToggle = gamepad1.a
+        val g1 = gamepad1
+        val g2 = gamepad2
+
+        val headingToggle = g1.a || g2.a
         if (
-            controlMode == DriveControlMode.ARCADE &&
+            (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) &&
             headingToggle &&
             !previousHeadingToggle
         ) {
@@ -44,45 +55,94 @@ abstract class SharedDriveTeleOp protected constructor(
         }
         previousHeadingToggle = headingToggle
 
-        val flywheelToggle = gamepad1.b
+        val flywheelToggle = g1.b || g2.b
         if (flywheelToggle && !previousFlywheelToggle) {
             flywheel.toggle()
         }
         previousFlywheelToggle = flywheelToggle
 
-        val flywheelIncrease = gamepad1.dpad_up
-        if (flywheelIncrease && !previousFlywheelIncrease) {
-            flywheel.increaseSpeed()
-        }
-        previousFlywheelIncrease = flywheelIncrease
+        val combinedRightStickY = -(g1.right_stick_y.toDouble() + g2.right_stick_y.toDouble())
+        val combinedRightStickX = -(g1.right_stick_x.toDouble() + g2.right_stick_x.toDouble())
+        val combinedLeftStickY = -(g1.left_stick_y.toDouble() + g2.left_stick_y.toDouble())
 
-        val flywheelDecrease = gamepad1.dpad_down
-        if (flywheelDecrease && !previousFlywheelDecrease) {
-            flywheel.decreaseSpeed()
-        }
-        previousFlywheelDecrease = flywheelDecrease
+        val forwardInput = deadband(combinedRightStickY).coerceIn(-1.0, 1.0)
+        val turnInput = deadband(combinedRightStickX).coerceIn(-1.0, 1.0)
+        val tankLeft = deadband(combinedRightStickY).coerceIn(-1.0, 1.0)
+        val tankRight = deadband(combinedLeftStickY).coerceIn(-1.0, 1.0)
 
-        val leftStickY =
-            deadband(-gamepad1.left_stick_y.toDouble())
-        val rightStickY =
-            deadband(-gamepad1.right_stick_y.toDouble())
-        val rightStickX =
-            deadband(-gamepad1.right_stick_x.toDouble())
         val drive = when (controlMode) {
             DriveControlMode.ARCADE -> drivetrain.drive(
-                forward = leftStickY,
-                turn = rightStickX,
+                forward = forwardInput,
+                turn = turnInput,
+            )
+
+            DriveControlMode.SPLIT_ARCADE -> drivetrain.drive(
+                forward = deadband(combinedLeftStickY).coerceIn(-1.0, 1.0),
+                turn = turnInput,
             )
 
             DriveControlMode.TANK -> drivetrain.driveTank(
-                left = rightStickY,
-                right = leftStickY,
+                left = tankLeft,
+                right = tankRight,
             )
         }
         val flywheelState = flywheel.update()
 
+        val hexToggle = g1.x || g2.x
+        if (hexToggle && !previousHexToggle) {
+            intake.toggleHexDirection()
+        }
+        previousHexToggle = hexToggle
+
+        // Start + Y  →  toggle full-robot datalog (Arcade / Split Arcade only)
+        if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
+            val datalogToggle = (g1.start && g1.y) || (g2.start && g2.y)
+            if (datalogToggle && !previousDatalogToggle) {
+                datalogger.toggleLogging()
+            }
+            previousDatalogToggle = datalogToggle
+
+            if (datalogger.isLogging) {
+                val hubTemps = lynxModules.map { hub ->
+                    try { hub.getTemperature(TempUnit.CELSIUS) } catch (e: Exception) { Double.NaN }
+                }
+                datalogger.writeRow(
+                    gamepad1 = gamepad1,
+                    gamepad2 = gamepad2,
+                    drive = drive,
+                    flywheel = flywheelState,
+                    intake = intake,
+                    hubTemperaturesCelsius = hubTemps,
+                )
+            }
+        }
+
+        // Reversed Intake controls on Triggers (and Bumpers as fallback)
+        // LT/LB = Intake, RT/RB = Outtake
+        val intakeInput = g1.left_trigger > 0.1 || g2.left_trigger > 0.1 || g1.left_bumper || g2.left_bumper
+        val outtakeInput = g1.right_trigger > 0.1 || g2.right_trigger > 0.1 || g1.right_bumper || g2.right_bumper
+
+        if (intakeInput) {
+            intake.startIntake()
+        } else if (outtakeInput) {
+            intake.startOuttake()
+        } else {
+            intake.stopMotor()
+        }
+
+        val servoBwd = g1.dpad_left || g2.dpad_left
+        val servoFwd = g1.dpad_right || g2.dpad_right
+
+        if (servoBwd) {
+            intake.moveServosBackward()
+        } else if (servoFwd) {
+            intake.moveServosForward()
+        } else {
+            intake.stopServos()
+        }
+
         when (controlMode) {
-            DriveControlMode.ARCADE -> telemetry.addData(
+            DriveControlMode.ARCADE, DriveControlMode.SPLIT_ARCADE -> telemetry.addData(
                 "Input",
                 "forward=%.2f→%.2f turn=%.2f hold=%s",
                 drive.requestedForward,
@@ -94,8 +154,8 @@ abstract class SharedDriveTeleOp protected constructor(
             DriveControlMode.TANK -> telemetry.addData(
                 "Input",
                 "left motor(R stick)=%.2f right motor(L stick)=%.2f",
-                rightStickY,
-                leftStickY,
+                tankLeft,
+                tankRight,
             )
         }
         telemetry.addData(
@@ -162,6 +222,19 @@ abstract class SharedDriveTeleOp protected constructor(
             flywheelState.secondaryMotor.currentAmps,
         )
         telemetry.addData(
+            "Intake",
+            "hex=%s",
+            if (intake.hexReversed) "OPPOSITE" else "SAME",
+        )
+        if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
+            telemetry.addData(
+                "Datalog",
+                "%s rows=%d",
+                if (datalogger.isLogging) "● REC" else "○ off",
+                datalogger.rowCount,
+            )
+        }
+        telemetry.addData(
             "Flywheel wheel",
             "rim=%.1f m/s",
             flywheelState.surfaceSpeedMetersPerSecond,
@@ -171,6 +244,9 @@ abstract class SharedDriveTeleOp protected constructor(
     override fun stop() {
         drivetrain.stop()
         flywheel.stop()
+        intake.stopMotor()
+        intake.stopServos()
+        datalogger.stopLogging()
     }
 
     private fun deadband(value: Double): Double =
@@ -184,3 +260,7 @@ abstract class SharedDriveTeleOp protected constructor(
 @TeleOp(name = "FGC: Arcade Drive", group = "FGC Vietnam")
 class DrivetrainTeleOp :
     SharedDriveTeleOp(DriveControlMode.ARCADE)
+
+@TeleOp(name = "FGC: Split Arcade Drive", group = "FGC Vietnam")
+class DrivetrainSplitArcadeTeleOp :
+    SharedDriveTeleOp(DriveControlMode.SPLIT_ARCADE)

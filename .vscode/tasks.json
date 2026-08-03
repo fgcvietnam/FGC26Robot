@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "FTC: Connect Control Hub",
+      "type": "shell",
+      "command": "adb connect 192.168.43.1:5555",
+      "problemMatcher": []
+    },
+    {
+      "label": "FTC: Build",
+      "type": "shell",
+      "command": "./gradlew :TeamCode:assembleDebug --offline",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FTC: Upload to Control Hub",
+      "type": "shell",
+      "command": "./gradlew :TeamCode:installDebug --offline",
+      "problemMatcher": []
+    },
+    {
+      "label": "FTC: Logcat",
+      "type": "shell",
+      "command": "adb logcat",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "FTC: Restart Robot Controller",
+      "type": "shell",
+      "command": "adb shell monkey -p com.qualcomm.ftcrobotcontroller 1",
+      "problemMatcher": []
+    }
+  ]
+}

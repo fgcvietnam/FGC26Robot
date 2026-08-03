@@ -31,6 +31,17 @@ internal data class DriveTelemetry(
     val linearSpeedMmPerSecond: Double,
     val batteryVoltage: Double,
     val headingHoldEnabled: Boolean,
+    // Extended telemetry for datalogging
+    val leftEncoderPosition: Int,
+    val rightEncoderPosition: Int,
+    val leftMotorPower: Double,
+    val rightMotorPower: Double,
+    val pitchDegrees: Double,
+    val rollDegrees: Double,
+    val pitchRate: Double,
+    val rollRate: Double,
+    val leftWheelSpeedMmPerSecond: Double,
+    val rightWheelSpeedMmPerSecond: Double,
 )
 
 internal class Drivetrain(hardwareMap: HardwareMap) {
@@ -63,7 +74,7 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
     private val imu = hardwareMap.get(IMU::class.java, IMU_NAME).apply {
         val orientation = RevHubOrientationOnRobot(
             RevHubOrientationOnRobot.LogoFacingDirection.UP,
-            RevHubOrientationOnRobot.UsbFacingDirection.BACKWARD,
+            RevHubOrientationOnRobot.UsbFacingDirection.FORWARD,
         )
 
         check(initialize(IMU.Parameters(orientation))) {
@@ -128,10 +139,14 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
             limitedForward = forward
             forward
         }
-        val currentHeading = heading()
-        val yawRate = imu.getRobotAngularVelocity(AngleUnit.DEGREES)
-            .zRotationRate
-            .toDouble()
+        val robotAngles = imu.robotYawPitchRollAngles
+        val currentHeading = robotAngles.getYaw(AngleUnit.DEGREES)
+        val pitchDegrees = robotAngles.getPitch(AngleUnit.DEGREES)
+        val rollDegrees = robotAngles.getRoll(AngleUnit.DEGREES)
+        val angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES)
+        val yawRate = angularVelocity.zRotationRate.toDouble()
+        val pitchRate = angularVelocity.xRotationRate.toDouble()
+        val rollRate = angularVelocity.yRotationRate.toDouble()
         val translating = abs(forward) >= DRIVE_DEADBAND
         zeroForwardSeconds = if (translating) {
             0.0
@@ -242,6 +257,18 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
             batteryVoltage = voltageSensor.voltage,
             headingHoldEnabled =
                 headingHoldEnabled && allowHeadingHold,
+            leftEncoderPosition = leftMotor.currentPosition,
+            rightEncoderPosition = rightMotor.currentPosition,
+            leftMotorPower = leftMotor.power,
+            rightMotorPower = rightMotor.power,
+            pitchDegrees = pitchDegrees,
+            rollDegrees = rollDegrees,
+            pitchRate = pitchRate,
+            rollRate = rollRate,
+            leftWheelSpeedMmPerSecond =
+                leftActualVelocity * DrivetrainConfig.millimetersPerEncoderTick,
+            rightWheelSpeedMmPerSecond =
+                rightActualVelocity * DrivetrainConfig.millimetersPerEncoderTick,
         )
     }
 

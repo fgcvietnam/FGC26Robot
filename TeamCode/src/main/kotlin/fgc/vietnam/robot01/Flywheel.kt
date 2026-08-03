@@ -4,6 +4,7 @@ import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
+import com.qualcomm.robotcore.hardware.PIDFCoefficients
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 import kotlin.math.abs
 import kotlin.math.max
@@ -12,6 +13,8 @@ internal data class FlywheelMotorTelemetry(
     val rpm: Double,
     val velocity: Double,
     val currentAmps: Double,
+    val encoderPosition: Int,
+    val motorPower: Double,
 )
 
 internal data class FlywheelTelemetry(
@@ -40,20 +43,10 @@ internal class Flywheel(hardwareMap: HardwareMap) {
     )
 
     private var enabled = false
-    private var targetRpm = FlywheelConfig.DEFAULT_RPM
+    private val targetRpm = FlywheelConfig.DEFAULT_RPM
 
     fun toggle() {
         enabled = !enabled
-    }
-
-    fun increaseSpeed() {
-        targetRpm = (targetRpm + FlywheelConfig.RPM_STEP)
-            .coerceAtMost(FlywheelConfig.MAX_RPM)
-    }
-
-    fun decreaseSpeed() {
-        targetRpm = (targetRpm - FlywheelConfig.RPM_STEP)
-            .coerceAtLeast(FlywheelConfig.MIN_RPM)
     }
 
     fun update(): FlywheelTelemetry {
@@ -99,6 +92,8 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             rpm = FlywheelConfig.ticksPerSecondToRpm(velocity),
             velocity = velocity,
             currentAmps = motor.getCurrent(CurrentUnit.AMPS),
+            encoderPosition = motor.currentPosition,
+            motorPower = motor.power,
         )
     }
 
@@ -110,6 +105,15 @@ internal class Flywheel(hardwareMap: HardwareMap) {
         this.direction = direction
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.FLOAT
         mode = DcMotor.RunMode.RUN_USING_ENCODER
+
+        val pidf = PIDFCoefficients(
+            FlywheelConfig.PIDF_P,
+            FlywheelConfig.PIDF_I,
+            FlywheelConfig.PIDF_D,
+            FlywheelConfig.PIDF_F,
+        )
+        setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf)
+
         power = 0.0
     }
 

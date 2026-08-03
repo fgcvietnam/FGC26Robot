@@ -107,7 +107,7 @@ class Dt00NoLoadOpMode : OpMode() {
         imu = hardwareMap.get(IMU::class.java, IMU_NAME).apply {
             val orientation = RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.BACKWARD,
+                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD,
             )
             check(initialize(IMU.Parameters(orientation))) {
                 "Unable to initialize IMU '$IMU_NAME'"
