@@ -336,10 +336,3 @@ abstract class SharedDriveTeleOp protected constructor(
     }
 }
 
-@TeleOp(name = "FGC: Arcade Drive", group = "FGC Vietnam")
-class DrivetrainTeleOp :
-    SharedDriveTeleOp(DriveControlMode.ARCADE)
-
-@TeleOp(name = "FGC: Split Arcade Drive", group = "FGC Vietnam")
-class DrivetrainSplitArcadeTeleOp :
-    SharedDriveTeleOp(DriveControlMode.SPLIT_ARCADE)

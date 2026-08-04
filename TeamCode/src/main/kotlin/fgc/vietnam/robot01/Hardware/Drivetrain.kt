@@ -233,8 +233,8 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
             right = rightTargetVelocity,
         )
         if (DATALOG_ENABLED) {
-            val leftActualVelocity = leftMotor.velocity
-            val rightActualVelocity = rightMotor.velocity
+        val leftActualVelocity = leftMotor.velocity
+        val rightActualVelocity = rightMotor.velocity
             return DriveTelemetry(
                 requestedForward = forward,
                 limitedForward = smoothForward,
