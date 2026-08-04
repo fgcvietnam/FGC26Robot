@@ -1,13 +1,21 @@
 package fgc.vietnam.robot01
 
+import TeamVietnam.control.PIDFController
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
-import com.qualcomm.robotcore.hardware.PIDFCoefficients
+import fgc.vietnam.robot01.FlywheelConfig.DATALOG_ENABLED
+import fgc.vietnam.robot01.FlywheelConfig.ENABLE_PIDF_TUNING
+import fgc.vietnam.robot01.FlywheelConfig.FF_KA
+import fgc.vietnam.robot01.FlywheelConfig.FF_KS
+import fgc.vietnam.robot01.FlywheelConfig.FF_KV
+import fgc.vietnam.robot01.FlywheelConfig.PIDF_D
+import fgc.vietnam.robot01.FlywheelConfig.PIDF_I
+import fgc.vietnam.robot01.FlywheelConfig.PIDF_P
+import fgc.vietnam.robot01.Utils.FeedForward
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 import kotlin.math.abs
-import kotlin.math.max
 
 internal data class FlywheelMotorTelemetry(
     val rpm: Double,
@@ -22,25 +30,40 @@ internal data class FlywheelTelemetry(
     val atSpeed: Boolean,
     val targetRpm: Double,
     val targetVelocity: Double,
-    val primaryMotor: FlywheelMotorTelemetry,
-    val secondaryMotor: FlywheelMotorTelemetry,
+    val rightShooterMotor: FlywheelMotorTelemetry,
+    val leftShooterMotor: FlywheelMotorTelemetry,
     val shaftRpm: Double,
     val rpmDifference: Double,
     val surfaceSpeedMetersPerSecond: Double,
 )
 
+
 internal class Flywheel(hardwareMap: HardwareMap) {
-    private val primaryMotor = motor(
+    private val rightShooterMotor = motor(
         hardwareMap = hardwareMap,
-        name = FlywheelConfig.PRIMARY_MOTOR_NAME,
+        name = FlywheelConfig.LEFT_SHOOTER_MOTOR,
         direction = DcMotorSimple.Direction.REVERSE,
     )
 
-    private val secondaryMotor = motor(
+    private val leftShooterMotor = motor(
         hardwareMap = hardwareMap,
-        name = FlywheelConfig.SECONDARY_MOTOR_NAME,
+        name = FlywheelConfig.RIGHT_SHOOTER_MOTOR,
         direction = DcMotorSimple.Direction.FORWARD,
     )
+    private var controlVelocity = 0.0
+    private var mismatchStartTime = -1L
+    private var leftEncoderHealthy = true
+    private var rightEncoderHealthy = true
+
+    private companion object {
+        const val ENCODER_MIN_VELOCITY = 100.0
+        const val ENCODER_MISMATCH_RATIO = 0.10      // 10%
+        const val ENCODER_MISMATCH_TIME_MS = 250L
+
+        const val READY_ERROR_RATIO = 0.05
+
+        const val MIN_READY_ERROR_RPM = 100.0
+    }
 
     private var enabled = false
     private val targetRpm = FlywheelConfig.DEFAULT_RPM
@@ -49,36 +72,126 @@ internal class Flywheel(hardwareMap: HardwareMap) {
         enabled = !enabled
     }
 
-    fun update(): FlywheelTelemetry {
-        val commandedRpm = if (enabled) targetRpm else 0.0
-        val targetVelocity = FlywheelConfig.rpmToTicksPerSecond(commandedRpm)
-        primaryMotor.velocity = targetVelocity
-        secondaryMotor.velocity = targetVelocity
+    private val shooterPIDF = PIDFController(
+        kP = PIDF_P,
+        kI = PIDF_I,
+        kD = PIDF_D,
+        FeedForward(FF_KS, FF_KV, FF_KA)
+    )
 
-        val primaryState = motorTelemetry(primaryMotor)
-        val secondaryState = motorTelemetry(secondaryMotor)
-        val shaftRpm = (primaryState.rpm + secondaryState.rpm) / 2.0
-        val allowedErrorRpm = max(MIN_READY_ERROR_RPM, targetRpm * READY_ERROR_RATIO)
+    fun update(): FlywheelTelemetry? {
+        if (enabled) {
+            val now = System.currentTimeMillis() / 1000.0
 
-        return FlywheelTelemetry(
-            enabled = enabled,
-            atSpeed = enabled &&
-                abs(primaryState.rpm - targetRpm) <= allowedErrorRpm &&
-                abs(secondaryState.rpm - targetRpm) <= allowedErrorRpm,
-            targetRpm = targetRpm,
-            targetVelocity = targetVelocity,
-            primaryMotor = primaryState,
-            secondaryMotor = secondaryState,
-            shaftRpm = shaftRpm,
-            rpmDifference = abs(primaryState.rpm - secondaryState.rpm),
-            surfaceSpeedMetersPerSecond = FlywheelConfig.rpmToSurfaceSpeedMetersPerSecond(shaftRpm),
-        )
+
+            if (ENABLE_PIDF_TUNING) {
+                shooterPIDF.setPIDF(
+                    PIDF_P,
+                    PIDF_I,
+                    PIDF_D,
+                    FeedForward(
+                        FF_KS,
+                        FF_KV,
+                        FF_KA
+                    )
+                )
+            }
+
+
+            val leftVelocity: Double = leftShooterMotor.getVelocity()
+            val rightVelocity: Double = rightShooterMotor.getVelocity()
+
+
+            val velocityDifference = abs(leftVelocity - rightVelocity)
+
+            val allowedDifference = maxOf(
+                ENCODER_MIN_VELOCITY,
+                maxOf(leftVelocity, rightVelocity) * ENCODER_MISMATCH_RATIO
+            )
+
+            if (velocityDifference > allowedDifference) {
+                if (mismatchStartTime == -1L) {
+                    mismatchStartTime = System.currentTimeMillis()
+                }
+                if (System.currentTimeMillis() - mismatchStartTime >
+                    ENCODER_MISMATCH_TIME_MS
+                ) {
+                    leftEncoderHealthy =
+                        !(leftVelocity < ENCODER_MIN_VELOCITY &&
+                                rightVelocity > ENCODER_MIN_VELOCITY * 5)
+
+                    rightEncoderHealthy =
+                        !(rightVelocity < ENCODER_MIN_VELOCITY &&
+                                leftVelocity > ENCODER_MIN_VELOCITY * 5)
+                }
+
+            } else {
+                mismatchStartTime = -1L
+                leftEncoderHealthy = true
+                rightEncoderHealthy = true
+            }
+
+            controlVelocity = when {
+                leftEncoderHealthy -> leftVelocity
+                rightEncoderHealthy -> rightVelocity
+                else -> 0.0
+            }
+
+            val output = shooterPIDF.calculate(
+                controlVelocity,
+                FlywheelConfig.rpmToTicksPerSecond(targetRpm)
+            )
+
+            leftShooterMotor.setPower(output)
+            rightShooterMotor.setPower(output)
+
+            val leftState = motorTelemetry(leftShooterMotor)
+            val rightState = motorTelemetry(rightShooterMotor)
+
+            val shaftRpm =
+                (leftState.rpm + rightState.rpm) / 2.0
+
+            val allowedErrorRpm = maxOf(
+                MIN_READY_ERROR_RPM,
+                targetRpm * READY_ERROR_RATIO
+            )
+            if (DATALOG_ENABLED || ENABLE_PIDF_TUNING) {
+                return FlywheelTelemetry(
+                    enabled = true,
+                    atSpeed =
+                        abs(leftState.rpm - targetRpm) <= allowedErrorRpm &&
+                                abs(rightState.rpm - targetRpm) <= allowedErrorRpm,
+
+                    targetRpm = targetRpm,
+                    targetVelocity = FlywheelConfig.rpmToTicksPerSecond(targetRpm),
+
+                    leftShooterMotor = leftState,
+                    rightShooterMotor = rightState,
+
+                    shaftRpm = shaftRpm,
+                    rpmDifference = abs(leftState.rpm - rightState.rpm),
+
+                    surfaceSpeedMetersPerSecond =
+                        FlywheelConfig.rpmToSurfaceSpeedMetersPerSecond(shaftRpm)
+                )
+            } else return null;
+
+
+
+        } else {
+            leftShooterMotor.setVelocity(0.0)
+            rightShooterMotor.setVelocity(0.0)
+            leftShooterMotor.setPower(0.0)
+            rightShooterMotor.setPower(0.0)
+            return null;
+        }
+
     }
 
     fun stop() {
         enabled = false
-        primaryMotor.velocity = 0.0
-        secondaryMotor.velocity = 0.0
+        leftShooterMotor.velocity = 0.0
+        rightShooterMotor.velocity = 0.0
     }
 
     private fun motorTelemetry(motor: DcMotorEx): FlywheelMotorTelemetry =
@@ -97,20 +210,19 @@ internal class Flywheel(hardwareMap: HardwareMap) {
     ): DcMotorEx = hardwareMap.get(DcMotorEx::class.java, name).apply {
         this.direction = direction
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.FLOAT
-        mode = DcMotor.RunMode.RUN_USING_ENCODER
-
-        val pidf = PIDFCoefficients(
-            FlywheelConfig.PIDF_P,
-            FlywheelConfig.PIDF_I,
-            FlywheelConfig.PIDF_D,
-            FlywheelConfig.PIDF_F,
-        )
-        setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf)
+        mode = DcMotor.RunMode.STOP_AND_RESET_ENCODER
+        mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         power = 0.0
     }
 
-    private companion object {
-        const val READY_ERROR_RATIO = 0.05
-        const val MIN_READY_ERROR_RPM = 100.0
-    }
+    private fun getVelocity(motor: DcMotorEx): Double = motor.velocity
+
+    public fun getTargetVelocity(): Double = targetRpm
+
+
+
+    public fun getCurrentVelocity(): Double = controlVelocity
+
+
+
 }

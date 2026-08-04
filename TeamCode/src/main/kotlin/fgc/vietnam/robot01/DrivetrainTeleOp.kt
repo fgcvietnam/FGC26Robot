@@ -1,8 +1,10 @@
 package fgc.vietnam.robot01
 
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.hardware.lynx.LynxModule
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import fgc.vietnam.robot01.FlywheelConfig.ENABLE_PIDF_TUNING
 import org.firstinspires.ftc.robotcore.external.navigation.TempUnit
 import kotlin.math.abs
 
@@ -27,6 +29,9 @@ abstract class SharedDriveTeleOp protected constructor(
     private var previousDatalogToggle = false
     private var previousIntakeToggle = false
 
+    private lateinit var packet: TelemetryPacket
+
+
     override fun init() {
         drivetrain = Drivetrain(hardwareMap)
         flywheel = Flywheel(hardwareMap)
@@ -43,6 +48,10 @@ abstract class SharedDriveTeleOp protected constructor(
     }
 
     override fun loop() {
+        val loopStartTime = getRuntime()
+
+        packet = TelemetryPacket()
+
         val g1 = gamepad1
         val g2 = gamepad2
 
@@ -78,13 +87,13 @@ abstract class SharedDriveTeleOp protected constructor(
             )
 
             DriveControlMode.SPLIT_ARCADE -> drivetrain.drive(
-                forward = deadband(combinedLeftStickY).coerceIn(-1.0, 1.0),
+                forward = -deadband(combinedLeftStickY).coerceIn(-1.0, 1.0),
                 turn = turnInput,
             )
 
             DriveControlMode.TANK -> drivetrain.driveTank(
-                left = tankLeft,
-                right = tankRight,
+                left = -tankLeft,
+                right = -tankRight,
             )
         }
         val flywheelState = flywheel.update()
@@ -145,6 +154,19 @@ abstract class SharedDriveTeleOp protected constructor(
             intake.stopServos()
         }
 
+        // Performance metrics (calculate once, use multiple times)
+        val loopTimeMs: Double = (getRuntime() - loopStartTime) * 1000.0
+        packet.put("Loop Time (ms)", loopTimeMs)
+
+        telemetry.addData("Loop Time", String.format("%.1f ms", loopTimeMs))
+
+        if (ENABLE_PIDF_TUNING){
+            telemetry.addData("TargetVelocity", flywheel.getTargetVelocity())
+            telemetry.addData("CurrentVelocity", flywheel.getCurrentVelocity())
+        }
+
+        if (flywheelState == null || drive == null || intake == null) return
+
         when (controlMode) {
             DriveControlMode.ARCADE, DriveControlMode.SPLIT_ARCADE -> telemetry.addData(
                 "Input",
@@ -155,96 +177,97 @@ abstract class SharedDriveTeleOp protected constructor(
                 if (drive.headingHoldEnabled) "ON" else "OFF",
             )
 
-            DriveControlMode.TANK -> telemetry.addData(
-                "Input",
-                "left motor(R stick)=%.2f right motor(L stick)=%.2f",
-                tankLeft,
-                tankRight,
-            )
-        }
-        telemetry.addData(
-            "Heading",
-            "now=%.1f° target=%.1f° error=%+.2f° rate=%+.1f°/s",
-            drive.heading,
-            drive.targetHeading,
-            drive.headingError,
-            drive.yawRate,
-        )
-        telemetry.addData(
-            "Heading PID",
-            "P=%+.3f I=%+.3f D=%+.3f total=%+.3f",
-            drive.proportionalCorrection,
-            drive.integralCorrection,
-            drive.derivativeCorrection,
-            drive.headingCorrection,
-        )
-        telemetry.addData(
-            "Velocity",
-            "L=%.0f/%.0f R=%.0f/%.0f ticks/s",
-            drive.leftActualVelocity,
-            drive.leftTargetVelocity,
-            drive.rightActualVelocity,
-            drive.rightTargetVelocity,
-        )
-        telemetry.addData(
-            "Drive current",
-            "L=%.2f A R=%.2f A total=%.2f A",
-            drive.leftCurrentAmps,
-            drive.rightCurrentAmps,
-            drive.leftCurrentAmps + drive.rightCurrentAmps,
-        )
-        telemetry.addData(
-            "Robot",
-            "speed=%.0f mm/s battery=%.2f V gear=%.1f:1",
-            drive.linearSpeedMmPerSecond,
-            drive.batteryVoltage,
-            DrivetrainConfig.GEAR_REDUCTION,
-        )
-        telemetry.addData(
-            "Flywheel",
-            "%s %s shaft=%.0f/%.0f rpm difference=%.0f",
-            if (flywheelState.enabled) "ON" else "OFF",
-            if (flywheelState.atSpeed) "READY" else "—",
-            flywheelState.shaftRpm,
-            flywheelState.targetRpm,
-            flywheelState.rpmDifference,
-        )
-        telemetry.addData(
-            "Flywheel M2",
-            "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
-            flywheelState.primaryMotor.rpm,
-            flywheelState.primaryMotor.velocity,
-            flywheelState.targetVelocity,
-            flywheelState.primaryMotor.currentAmps,
-        )
-        telemetry.addData(
-            "Flywheel M3",
-            "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
-            flywheelState.secondaryMotor.rpm,
-            flywheelState.secondaryMotor.velocity,
-            flywheelState.targetVelocity,
-            flywheelState.secondaryMotor.currentAmps,
-        )
-        telemetry.addData(
-            "Intake",
-            "state=%s hex=%s",
-            intake.state,
-            if (intake.hexReversed) "OPPOSITE" else "SAME",
-        )
-        if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
+                DriveControlMode.TANK -> telemetry.addData(
+                    "Input",
+                    "left motor(R stick)=%.2f right motor(L stick)=%.2f",
+                    tankLeft,
+                    tankRight,
+                )
+            }
             telemetry.addData(
-                "Datalog",
-                "%s rows=%d",
-                if (datalogger.isLogging) "● REC" else "○ off",
-                datalogger.rowCount,
+                "Heading",
+                "now=%.1f° target=%.1f° error=%+.2f° rate=%+.1f°/s",
+                drive.heading,
+                drive.targetHeading,
+                drive.headingError,
+                drive.yawRate,
+            )
+            telemetry.addData(
+                "Heading PID",
+                "P=%+.3f I=%+.3f D=%+.3f total=%+.3f",
+                drive.proportionalCorrection,
+                drive.integralCorrection,
+                drive.derivativeCorrection,
+                drive.headingCorrection,
+            )
+            telemetry.addData(
+                "Velocity",
+                "L=%.0f/%.0f R=%.0f/%.0f ticks/s",
+                drive.leftActualVelocity,
+                drive.leftTargetVelocity,
+                drive.rightActualVelocity,
+                drive.rightTargetVelocity,
+            )
+            telemetry.addData(
+                "Drive current",
+                "L=%.2f A R=%.2f A total=%.2f A",
+                drive.leftCurrentAmps,
+                drive.rightCurrentAmps,
+                drive.leftCurrentAmps + drive.rightCurrentAmps,
+            )
+            telemetry.addData(
+                "Robot",
+                "speed=%.0f mm/s battery=%.2f V gear=%.1f:1",
+                drive.linearSpeedMmPerSecond,
+                drive.batteryVoltage,
+                DrivetrainConfig.GEAR_REDUCTION,
+            )
+            telemetry.addData(
+                "Flywheel",
+                "%s %s shaft=%.0f/%.0f rpm difference=%.0f",
+                if (flywheelState.enabled) "ON" else "OFF",
+                if (flywheelState.atSpeed) "READY" else "—",
+                flywheelState.shaftRpm,
+                flywheelState.targetRpm,
+                flywheelState.rpmDifference,
+            )
+            telemetry.addData(
+                "Flywheel M2",
+                "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
+                flywheelState?.leftShooterMotor?.rpm,
+                flywheelState.leftShooterMotor.velocity,
+                flywheelState.targetVelocity,
+                flywheelState.leftShooterMotor.currentAmps,
+            )
+            telemetry.addData(
+                "Flywheel M3",
+                "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
+                flywheelState.rightShooterMotor.rpm,
+                flywheelState.rightShooterMotor.velocity,
+                flywheelState.targetVelocity,
+                flywheelState.rightShooterMotor.currentAmps,
+            )
+
+            telemetry.addData(
+                "Intake",
+                "state=%s hex=%s",
+                intake.state,
+                if (intake.hexReversed) "OPPOSITE" else "SAME",
+            )
+            if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
+                telemetry.addData(
+                    "Datalog",
+                    "%s rows=%d",
+                    if (datalogger.isLogging) "● REC" else "○ off",
+                    datalogger.rowCount,
+                )
+            }
+            telemetry.addData(
+                "Flywheel wheel",
+                "rim=%.1f m/s",
+                flywheelState.surfaceSpeedMetersPerSecond,
             )
         }
-        telemetry.addData(
-            "Flywheel wheel",
-            "rim=%.1f m/s",
-            flywheelState.surfaceSpeedMetersPerSecond,
-        )
-    }
 
     override fun stop() {
         drivetrain.stop()

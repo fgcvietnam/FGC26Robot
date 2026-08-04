@@ -15,17 +15,17 @@ internal class Intake(hardwareMap: HardwareMap) {
         power = 0.0
     }
 
-    private val hexMotor = hardwareMap.get(DcMotor::class.java, "intakeHex").apply {
+    private val hexMotor = hardwareMap.get(DcMotor::class.java, "transfer").apply {
         direction = DcMotorSimple.Direction.FORWARD
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         power = 0.0
     }
 
-    private val servo1 = hardwareMap.get(CRServo::class.java, "servo1").apply {
+    private val servo1 = hardwareMap.get(CRServo::class.java, "leftIntakeServo").apply {
         direction = DcMotorSimple.Direction.FORWARD
     }
-    private val servo2 = hardwareMap.get(CRServo::class.java, "servo2").apply {
+    private val servo2 = hardwareMap.get(CRServo::class.java, "rightIntakeServo").apply {
         direction = DcMotorSimple.Direction.REVERSE
     }
 
@@ -95,11 +95,11 @@ internal class Intake(hardwareMap: HardwareMap) {
         val hexTargetPower = if (hexReverseHeld) 1.0 else -1.0
         when {
             outtakeHeld -> {
-                motor.power = -1.0
+                motor.power = 1.0
                 hexMotor.power = hexTargetPower
             }
             intakeEnabled -> {
-                motor.power = 1.0
+                motor.power = -1.0
                 hexMotor.power = hexTargetPower
             }
             else -> {

@@ -419,8 +419,8 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
     }
 
     private companion object {
-        const val LEFT_MOTOR_NAME = "left_drive"
-        const val RIGHT_MOTOR_NAME = "right_drive"
+        const val LEFT_MOTOR_NAME = "driveLeft"
+        const val RIGHT_MOTOR_NAME = "driveRight"
         const val IMU_NAME = "imu"
 
         const val DRIVE_DEADBAND = 0.05

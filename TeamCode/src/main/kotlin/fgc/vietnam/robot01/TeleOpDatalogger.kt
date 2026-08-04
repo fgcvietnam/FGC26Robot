@@ -34,10 +34,12 @@ internal class TeleOpDatalogger {
         gamepad1: Gamepad,
         gamepad2: Gamepad,
         drive: DriveTelemetry,
-        flywheel: FlywheelTelemetry,
+        flywheel: FlywheelTelemetry?,
         intake: Intake,
         hubTemperaturesCelsius: List<Double>,
     ) {
+        if (flywheel == null || drive == null || intake == null) return
+
         val log = logger ?: return
 
         // ── Timing ────────────────────────────────────────────────────────────
@@ -56,9 +58,8 @@ internal class TeleOpDatalogger {
         previousYawRate = drive.yawRate
 
         // ── Derived: flywheel RPM errors ──────────────────────────────────────
-        val fwPrimaryRpmError   = flywheel.primaryMotor.rpm   - flywheel.targetRpm
-        val fwSecondaryRpmError = flywheel.secondaryMotor.rpm - flywheel.targetRpm
-
+        val fwPrimaryRpmError   = flywheel.leftShooterMotor.rpm   - flywheel.targetRpm
+        val fwSecondaryRpmError = flywheel.rightShooterMotor.rpm - flywheel.targetRpm
         log.writeRow(
             listOf(
                 // ── Timing ────────────────────────────────────────────────────
@@ -188,21 +189,21 @@ internal class TeleOpDatalogger {
                 "%.4f".format(flywheel.surfaceSpeedMetersPerSecond),
                 "%.2f".format(flywheel.targetVelocity),
 
-                // ── Flywheel primary motor ──────────────────────────────────────
-                "%.2f".format(flywheel.primaryMotor.rpm),
+                // ── Flywheel left motor ──────────────────────────────────────
+                "%.2f".format(flywheel.leftShooterMotor.rpm),
                 "%.2f".format(fwPrimaryRpmError),
-                "%.2f".format(flywheel.primaryMotor.velocity),
-                "%.4f".format(flywheel.primaryMotor.currentAmps),
-                flywheel.primaryMotor.encoderPosition,
-                "%.4f".format(flywheel.primaryMotor.motorPower),
+                "%.2f".format(flywheel.leftShooterMotor.velocity),
+                "%.4f".format(flywheel.leftShooterMotor.currentAmps),
+                flywheel.leftShooterMotor.encoderPosition,
+                "%.4f".format(flywheel.leftShooterMotor.motorPower),
 
-                // ── Flywheel secondary motor ────────────────────────────────────
-                "%.2f".format(flywheel.secondaryMotor.rpm),
+                // ── Flywheel right motor ────────────────────────────────────
+                "%.2f".format(flywheel.rightShooterMotor.rpm),
                 "%.2f".format(fwSecondaryRpmError),
-                "%.2f".format(flywheel.secondaryMotor.velocity),
-                "%.4f".format(flywheel.secondaryMotor.currentAmps),
-                flywheel.secondaryMotor.encoderPosition,
-                "%.4f".format(flywheel.secondaryMotor.motorPower),
+                "%.2f".format(flywheel.rightShooterMotor.velocity),
+                "%.4f".format(flywheel.rightShooterMotor.currentAmps),
+                flywheel.rightShooterMotor.encoderPosition,
+                "%.4f".format(flywheel.rightShooterMotor.motorPower),
 
                 // ── Intake ──────────────────────────────────────────────────────
                 intake.hexReversed.i,
@@ -210,7 +211,7 @@ internal class TeleOpDatalogger {
                 "%.4f".format(intake.hexMotorPower),
                 "%.4f".format(intake.servo1Power),
                 "%.4f".format(intake.servo2Power),
-            ),
+            )
         )
     }
 
