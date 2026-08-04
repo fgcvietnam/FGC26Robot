@@ -60,6 +60,10 @@ abstract class SharedDriveTeleOp protected constructor(
                 "Tank: sticks Y | B flywheel | LT Intake toggle | LB Outtake hold | RT Hex reverse | D-pad L/R Servos"
             },
         )
+        val allHubs = hardwareMap.getAll<LynxModule?>(LynxModule::class.java)
+        for (module in allHubs) {
+            module?.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO)
+        }
     }
 
     override fun loop() {

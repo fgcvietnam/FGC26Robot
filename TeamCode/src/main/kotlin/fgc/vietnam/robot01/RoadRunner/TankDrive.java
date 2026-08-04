@@ -20,6 +20,7 @@ import com.acmerobotics.roadrunner.PoseVelocity2dDual;
 import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.ProfileParams;
 import com.acmerobotics.roadrunner.RamseteController;
+import com.acmerobotics.roadrunner.Rotation2d;
 import com.acmerobotics.roadrunner.TankKinematics;
 import com.acmerobotics.roadrunner.Time;
 import com.acmerobotics.roadrunner.TimeTrajectory;
@@ -47,12 +48,17 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import fgc.vietnam.robot01.Hardware.Vision;
 import fgc.vietnam.robot01.RoadRunner.messages.DriveCommandMessage;
 import fgc.vietnam.robot01.RoadRunner.messages.PoseMessage;
 import fgc.vietnam.robot01.RoadRunner.messages.TankCommandMessage;
@@ -60,6 +66,10 @@ import fgc.vietnam.robot01.RoadRunner.messages.TankLocalizerInputsMessage;
 
 @Config
 public final class TankDrive {
+    private Pose2d estimatedPose;
+    private final PoseEstimator poseEstimator;
+
+    private final Vision vision;
     public static class Params {
         // IMU orientation
         // TODO: fill in these values based on
@@ -69,13 +79,19 @@ public final class TankDrive {
         public RevHubOrientationOnRobot.UsbFacingDirection usbFacingDirection =
                 RevHubOrientationOnRobot.UsbFacingDirection.FORWARD;
 
+        public static final double TICKS_PER_REV = 365;
+        public static final double MAX_RPM = 460.4758;
+
+        public static double WHEEL_RADIUS = 3.5433070866; // in
+        public static double GEAR_RATIO = 1; // output (wheel) speed / input (motor) speed
+
         // drive model parameters
-        public double inPerTick = 0;
-        public double trackWidthTicks = 0;
+        public double inPerTick = (WHEEL_RADIUS * 2 * Math.PI * GEAR_RATIO) / TICKS_PER_REV;
+        public double trackWidthTicks = 16.9291338583; //in
 
         // feedforward parameters (in tick units)
         public double kS = 0;
-        public double kV = 0;
+        public double kV = 1.0 / rpmToVelocity(MAX_RPM);;
         public double kA = 0;
 
         // path profile parameters (in inches)
@@ -94,6 +110,10 @@ public final class TankDrive {
         // turn controller gains
         public double turnGain = 0.0;
         public double turnVelGain = 0.0;
+    }
+
+    public static double rpmToVelocity(double rpm) {
+        return rpm * Params.GEAR_RATIO * 2 * Math.PI * Params.WHEEL_RADIUS / 60.0;
     }
 
     public static Params PARAMS = new Params();
@@ -256,7 +276,9 @@ public final class TankDrive {
         voltageSensor = hardwareMap.voltageSensor.iterator().next();
 
         localizer = new DriveLocalizer(pose);
-
+        this.poseEstimator = new PoseEstimator(pose);
+        this.estimatedPose = pose;
+        vision = new Vision(hardwareMap);
         FlightRecorder.write("TANK_PARAMS", PARAMS);
     }
 
@@ -327,7 +349,7 @@ public final class TankDrive {
             updatePoseEstimate();
 
             PoseVelocity2dDual<Time> command = new RamseteController(kinematics.trackWidth, PARAMS.ramseteZeta, PARAMS.ramseteBBar)
-                    .compute(x, txWorldTarget, localizer.getPose());
+                    .compute(x, txWorldTarget, estimatedPose);
             driveCommandWriter.write(new DriveCommandMessage(command));
 
             TankKinematics.WheelVelocities<Time> wheelVels = kinematics.inverse(command);
@@ -345,11 +367,11 @@ public final class TankDrive {
                 m.setPower(rightPower);
             }
 
-            p.put("x", localizer.getPose().position.x);
-            p.put("y", localizer.getPose().position.y);
-            p.put("heading (deg)", Math.toDegrees(localizer.getPose().heading.toDouble()));
+            p.put("x", estimatedPose.position.x);
+            p.put("y", estimatedPose.position.y);
+            p.put("heading (deg)", Math.toDegrees(estimatedPose.heading.toDouble()));
 
-            Pose2d error = txWorldTarget.value().minusExp(localizer.getPose());
+            Pose2d error = txWorldTarget.value().minusExp(estimatedPose);
             p.put("xError", error.position.x);
             p.put("yError", error.position.y);
             p.put("headingError (deg)", Math.toDegrees(error.heading.toDouble()));
@@ -362,7 +384,7 @@ public final class TankDrive {
             Drawing.drawRobot(c, txWorldTarget.value());
 
             c.setStroke("#3F51B5");
-            Drawing.drawRobot(c, localizer.getPose());
+            Drawing.drawRobot(c, estimatedPose);
 
             c.setStroke("#4CAF50FF");
             c.setStrokeWidth(1);
@@ -417,7 +439,7 @@ public final class TankDrive {
             PoseVelocity2dDual<Time> command = new PoseVelocity2dDual<>(
                     Vector2dDual.constant(new Vector2d(0, 0), 3),
                     txWorldTarget.heading.velocity().plus(
-                            PARAMS.turnGain * localizer.getPose().heading.minus(txWorldTarget.heading.value()) +
+                            PARAMS.turnGain * estimatedPose.heading.minus(txWorldTarget.heading.value()) +
                             PARAMS.turnVelGain * (robotVelRobot.angVel - txWorldTarget.heading.velocity().value())
                     )
             );
@@ -445,7 +467,7 @@ public final class TankDrive {
             Drawing.drawRobot(c, txWorldTarget.value());
 
             c.setStroke("#3F51B5");
-            Drawing.drawRobot(c, localizer.getPose());
+            Drawing.drawRobot(c, estimatedPose);
 
             c.setStroke("#7C4DFFFF");
             c.fillCircle(turn.beginPose.position.x, turn.beginPose.position.y, 2);
@@ -462,18 +484,26 @@ public final class TankDrive {
 
     public PoseVelocity2d updatePoseEstimate() {
         PoseVelocity2d vel = localizer.update();
-        poseHistory.add(localizer.getPose());
 
-        while (poseHistory.size() > 100) {
-            poseHistory.removeFirst();
+        poseEstimator.updateOdometry(
+                localizer.getPose(), getImuHeading()
+        );
+
+        AprilTagDetection detection = vision.getBestDetection();
+
+        if (detection != null) {
+            Pose2d visionPose =
+                    vision.getRobotPose(detection);
+            poseEstimator.addVisionMeasurement(
+                    visionPose,
+                    detection
+            );
         }
 
-        estimatedPoseWriter.write(new PoseMessage(localizer.getPose()));
-
+        estimatedPose = poseEstimator.getPose();
 
         return vel;
     }
-
     private void drawPoseHistory(Canvas c) {
         double[] xPoints = new double[poseHistory.size()];
         double[] yPoints = new double[poseHistory.size()];
@@ -504,6 +534,15 @@ public final class TankDrive {
                 beginPose, 0.0,
                 defaultTurnConstraints,
                 defaultVelConstraint, defaultAccelConstraint
+        );
+    }
+
+    private Rotation2d getImuHeading() {
+        YawPitchRollAngles angles =
+                lazyImu.get().getRobotYawPitchRollAngles();
+
+        return Rotation2d.exp(
+                angles.getYaw(AngleUnit.RADIANS)
         );
     }
 }

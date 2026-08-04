@@ -22,12 +22,20 @@ internal class Intake(hardwareMap: HardwareMap) {
         power = 0.0
     }
 
-    private val servoRight = hardwareMap.get(CRServo::class.java, "leftIntakeServo").apply {
-        direction = DcMotorSimple.Direction.REVERSE
-    }
-    private val servoLeft = hardwareMap.get(CRServo::class.java, "rightIntakeServo").apply {
+    private val servoRightBack = hardwareMap.get(CRServo::class.java, "leftBackIntakeServo").apply {
         direction = DcMotorSimple.Direction.FORWARD
     }
+    private val servoLeftBack = hardwareMap.get(CRServo::class.java, "rightBackIntakeServo").apply {
+        direction = DcMotorSimple.Direction.REVERSE
+    }
+
+    private val servoRightFront = hardwareMap.get(CRServo::class.java, "leftFrontIntakeServo").apply {
+        direction = DcMotorSimple.Direction.REVERSE
+    }
+    private val servoLeftFront = hardwareMap.get(CRServo::class.java, "rightFrontIntakeServo").apply {
+        direction = DcMotorSimple.Direction.FORWARD
+    }
+
 
     var intakeEnabled: Boolean = false
         private set
@@ -66,23 +74,29 @@ internal class Intake(hardwareMap: HardwareMap) {
 
     val motorPower: Double get() = motor.power
     val hexMotorPower: Double get() = hexMotor.power
-    val servoRightPower: Double get() = servoRight.power
-    val servoLeftPower: Double get() = servoLeft.power
+    val servoRightPower: Double get() = servoRightBack.power
+    val servoLeftPower: Double get() = servoLeftBack.power
 
 
 
     fun moveServosForward() {
-        servoRight.power = 1.0
-        servoLeft.power = 1.0
+        servoRightBack.power = 1.0
+        servoLeftBack.power = 1.0
+        servoRightFront.power = 1.0
+        servoLeftFront.power = 1.0
     }
 
     fun moveServosBackward() {
-        servoRight.power = -1.0
-        servoLeft.power = -1.0
+        servoRightBack.power = -1.0
+        servoLeftBack.power = -1.0
+        servoRightFront.power = -1.0
+        servoLeftFront.power = -1.0
     }
 
     fun stopServos() {
-        servoRight.power = 0.0
-        servoLeft.power = 0.0
+        servoRightBack.power = 0.0
+        servoLeftBack.power = 0.0
+        servoRightFront.power = 0.0
+        servoLeftFront.power = 0.0
     }
 }

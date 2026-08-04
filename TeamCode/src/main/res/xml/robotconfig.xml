@@ -11,8 +11,8 @@
 
             <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
 
-            <ContinuousRotationServo name="leftIntakeServo" port="0"/>
-            <ContinuousRotationServo name="rightIntakeServo" port="2"/>
+            <ContinuousRotationServo name="leftBackIntakeServo" port="0"/>
+            <ContinuousRotationServo name="rightBackIntakeServo" port="2"/>
 
 
 
@@ -29,7 +29,8 @@
             <RevRoboticsUltraplanetaryHDHexMotor name="climbRight" port="2" />
             <RevRoboticsUltraplanetaryHDHexMotor name="climbLeft" port="3" />
 
-
+            <ContinuousRotationServo name="leftFrontIntakeServo" port="0"/>
+            <ContinuousRotationServo name="rightFrontIntakeServo" port="2"/>
 
 <!--            <DigitalDevice name="climbMagneticSwitchSensor" port="4"/>-->
 <!--            <DigitalDevice name="ballPusherMagneticSwitchSensor" port="6"/>-->
