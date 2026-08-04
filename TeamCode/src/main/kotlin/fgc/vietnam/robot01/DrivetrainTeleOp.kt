@@ -1,10 +1,18 @@
 package fgc.vietnam.robot01
 
+import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.hardware.lynx.LynxModule
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
-import fgc.vietnam.robot01.FlywheelConfig.ENABLE_PIDF_TUNING
+import fgc.vietnam.robot01.Config.DriverConfig
+import fgc.vietnam.robot01.Config.DrivetrainConfig
+import fgc.vietnam.robot01.Config.FlywheelConfig.ENABLE_PIDF_TUNING
+import fgc.vietnam.robot01.DataLogger.TeleOpDatalogger
+import fgc.vietnam.robot01.Hardware.Drivetrain
+import fgc.vietnam.robot01.Hardware.Flywheel
+import fgc.vietnam.robot01.Hardware.Intake
+import fgc.vietnam.robot01.Hardware.IntakeState
 import org.firstinspires.ftc.robotcore.external.navigation.TempUnit
 import kotlin.math.abs
 
@@ -25,14 +33,21 @@ abstract class SharedDriveTeleOp protected constructor(
 
     private var previousHeadingToggle = false
     private var previousFlywheelToggle = false
-    private var previousHexToggle = false
     private var previousDatalogToggle = false
-    private var previousIntakeToggle = false
+
+    private var intakeStop = false
+
+    private lateinit var dashboard: FtcDashboard
 
     private lateinit var packet: TelemetryPacket
 
+    private var bothButtonsStartTime: Double? = null
+
+    private var bothBumperHold = false
+
 
     override fun init() {
+        dashboard = FtcDashboard.getInstance()
         drivetrain = Drivetrain(hardwareMap)
         flywheel = Flywheel(hardwareMap)
         intake = Intake(hardwareMap)
@@ -65,12 +80,6 @@ abstract class SharedDriveTeleOp protected constructor(
         }
         previousHeadingToggle = headingToggle
 
-        val flywheelToggle = g1.b || g2.b
-        if (flywheelToggle && !previousFlywheelToggle) {
-            flywheel.toggle()
-        }
-        previousFlywheelToggle = flywheelToggle
-
         val combinedRightStickY = -(g1.right_stick_y.toDouble() + g2.right_stick_y.toDouble())
         val combinedRightStickX = -(g1.right_stick_x.toDouble() + g2.right_stick_x.toDouble())
         val combinedLeftStickY = -(g1.left_stick_y.toDouble() + g2.left_stick_y.toDouble())
@@ -98,53 +107,59 @@ abstract class SharedDriveTeleOp protected constructor(
         }
         val flywheelState = flywheel.update()
 
-        val hexToggle = g1.x || g2.x
-        if (hexToggle && !previousHexToggle) {
-            intake.toggleHexDirection()
+        val flywheelToggle = g1.b || g2.b
+        if (flywheelToggle && !previousFlywheelToggle) {
+            flywheel.toggle()
         }
-        previousHexToggle = hexToggle
-
-        // Start + Y  →  toggle full-robot datalog (Arcade / Split Arcade only)
-        if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
-            val datalogToggle = (g1.start && g1.y) || (g2.start && g2.y)
-            if (datalogToggle && !previousDatalogToggle) {
-                datalogger.toggleLogging()
-            }
-            previousDatalogToggle = datalogToggle
-
-            if (datalogger.isLogging) {
-                val hubTemps = lynxModules.map { hub ->
-                    try { hub.getTemperature(TempUnit.CELSIUS) } catch (e: Exception) { Double.NaN }
-                }
-                datalogger.writeRow(
-                    gamepad1 = gamepad1,
-                    gamepad2 = gamepad2,
-                    drive = drive,
-                    flywheel = flywheelState,
-                    intake = intake,
-                    hubTemperaturesCelsius = hubTemps,
-                )
-            }
-        }
+        previousFlywheelToggle = flywheelToggle
 
         // Intake controls:
         // LT = Toggle Intake (ON/OFF)
         // LB = Hold Outtake (momentary override)
         // RT = Hold Hex Motor Reverse (momentary reverse while active)
-        val intakeToggleInput = g1.left_trigger > 0.1 || g2.left_trigger > 0.1
-        val outtakeHoldInput = g1.left_bumper || g2.left_bumper
-        val hexReverseHoldInput = g1.right_trigger > 0.1 || g2.right_trigger > 0.1
+        val isOuttaking = g1.left_bumper || g2.left_bumper
 
-        if (intakeToggleInput && !previousIntakeToggle) {
-            intake.toggleIntake()
+        val isTransferring = g1.right_bumper || g2.right_bumper
+
+        val bothPressed = isOuttaking && isTransferring
+
+        if (isTransferring && !bothPressed) {
+            flywheel.enable()
+        } else {
+            flywheel.disable()
         }
-        previousIntakeToggle = intakeToggleInput
 
-        intake.setOuttakeHeld(outtakeHoldInput)
-        intake.setHexReverseHeld(hexReverseHoldInput)
+        if (bothPressed) {
+            if (bothButtonsStartTime == null) {
+                bothButtonsStartTime = getRuntime()
+            }
 
-        val servoBwd = g1.dpad_left || g2.dpad_left
-        val servoFwd = g1.dpad_right || g2.dpad_right
+            if (!bothBumperHold &&
+                getRuntime() - bothButtonsStartTime!! >= DriverConfig.intakeStopDely
+            ) {
+                if (intake.state == IntakeState.OFF) {
+                    intake.intake()
+                } else {
+                    intake.stopMotor()
+                }
+                bothBumperHold = true
+            }
+        } else {
+            bothButtonsStartTime = null
+            bothBumperHold = false
+        }
+
+        if (!bothBumperHold) {
+            when {
+                intake.state == IntakeState.OFF -> intake.stopMotor()
+                (isTransferring && flywheel.atTargetVelocity()) -> intake.transfer()
+                isOuttaking -> intake.outtake()
+                else -> intake.intake()
+            }
+        }
+
+        val servoBwd = g1.dpad_down || g2.dpad_down
+        val servoFwd = g1.dpad_up || g2.dpad_up
 
         if (servoBwd) {
             intake.moveServosBackward()
@@ -161,8 +176,41 @@ abstract class SharedDriveTeleOp protected constructor(
         telemetry.addData("Loop Time", String.format("%.1f ms", loopTimeMs))
 
         if (ENABLE_PIDF_TUNING){
-            telemetry.addData("TargetVelocity", flywheel.getTargetVelocity())
-            telemetry.addData("CurrentVelocity", flywheel.getCurrentVelocity())
+            packet.put("Target Velocity", flywheel.getTargetVelocity())
+            packet.put("Current Velocity", flywheel.getCurrentVelocity())
+            packet.put("At Target Velocity", flywheel.atTargetVelocity())
+            packet.put("Shooter Motor Power", flywheel.getPower())
+
+            dashboard.sendTelemetryPacket(packet)
+        }
+
+        if (drive != null) {
+            // Start + Y  →  toggle full-robot datalog (Arcade / Split Arcade only)
+            if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
+                val datalogToggle = (g1.start && g1.y) || (g2.start && g2.y)
+                if (datalogToggle && !previousDatalogToggle) {
+                    datalogger.toggleLogging()
+                }
+                previousDatalogToggle = datalogToggle
+
+                if (datalogger.isLogging) {
+                    val hubTemps = lynxModules.map { hub ->
+                        try {
+                            hub.getTemperature(TempUnit.CELSIUS)
+                        } catch (e: Exception) {
+                            Double.NaN
+                        }
+                    }
+                    datalogger.writeRow(
+                        gamepad1 = gamepad1,
+                        gamepad2 = gamepad2,
+                        drive = drive,
+                        flywheel = flywheelState,
+                        intake = intake,
+                        hubTemperaturesCelsius = hubTemps,
+                    )
+                }
+            }
         }
 
         if (flywheelState == null || drive == null || intake == null) return
@@ -234,7 +282,7 @@ abstract class SharedDriveTeleOp protected constructor(
             telemetry.addData(
                 "Flywheel M2",
                 "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
-                flywheelState?.leftShooterMotor?.rpm,
+                flywheelState.leftShooterMotor.rpm,
                 flywheelState.leftShooterMotor.velocity,
                 flywheelState.targetVelocity,
                 flywheelState.leftShooterMotor.currentAmps,
@@ -252,7 +300,6 @@ abstract class SharedDriveTeleOp protected constructor(
                 "Intake",
                 "state=%s hex=%s",
                 intake.state,
-                if (intake.hexReversed) "OPPOSITE" else "SAME",
             )
             if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
                 telemetry.addData(

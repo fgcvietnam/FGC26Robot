@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01
+package fgc.vietnam.robot01.Hardware
 
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
@@ -6,6 +6,8 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.IMU
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot
+import fgc.vietnam.robot01.Config.DrivetrainConfig
+import fgc.vietnam.robot01.Config.FlywheelConfig.DATALOG_ENABLED
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 import kotlin.math.abs
@@ -94,7 +96,7 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
     private var headingSettledSeconds = 0.0
     private var zeroForwardSeconds = 0.0
 
-    fun drive(forward: Double, turn: Double): DriveTelemetry =
+    fun drive(forward: Double, turn: Double): DriveTelemetry? =
         drive(
             forward = forward,
             turn = turn,
@@ -102,7 +104,7 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
             limitAcceleration = true,
         )
 
-    fun driveTank(left: Double, right: Double): DriveTelemetry {
+    fun driveTank(left: Double, right: Double): DriveTelemetry? {
         val elapsedSeconds = loopElapsedSeconds()
         limitedTankLeft = limitCommand(
             target = left,
@@ -129,7 +131,7 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
         allowHeadingHold: Boolean,
         limitAcceleration: Boolean,
         elapsedSeconds: Double = loopElapsedSeconds(),
-    ): DriveTelemetry {
+    ): DriveTelemetry? {
         val smoothForward = if (limitAcceleration) {
             limitForward(
                 target = forward,
@@ -232,44 +234,46 @@ internal class Drivetrain(hardwareMap: HardwareMap) {
         )
         val leftActualVelocity = leftMotor.velocity
         val rightActualVelocity = rightMotor.velocity
-
-        return DriveTelemetry(
-            requestedForward = forward,
-            limitedForward = smoothForward,
-            requestedTurn = turn,
-            heading = currentHeading,
-            targetHeading = targetHeading,
-            headingError = headingError,
-            headingCorrection = headingControl.correction,
-            proportionalCorrection = headingControl.proportional,
-            integralCorrection = headingControl.integral,
-            derivativeCorrection = headingControl.derivative,
-            yawRate = yawRate,
-            leftTargetVelocity = leftTargetVelocity,
-            leftActualVelocity = leftActualVelocity,
-            rightTargetVelocity = rightTargetVelocity,
-            rightActualVelocity = rightActualVelocity,
-            leftCurrentAmps = leftMotor.getCurrent(CurrentUnit.AMPS),
-            rightCurrentAmps = rightMotor.getCurrent(CurrentUnit.AMPS),
-            linearSpeedMmPerSecond = (
-                leftActualVelocity + rightActualVelocity
-            ) / 2.0 * DrivetrainConfig.millimetersPerEncoderTick,
-            batteryVoltage = voltageSensor.voltage,
-            headingHoldEnabled =
-                headingHoldEnabled && allowHeadingHold,
-            leftEncoderPosition = leftMotor.currentPosition,
-            rightEncoderPosition = rightMotor.currentPosition,
-            leftMotorPower = leftMotor.power,
-            rightMotorPower = rightMotor.power,
-            pitchDegrees = pitchDegrees,
-            rollDegrees = rollDegrees,
-            pitchRate = pitchRate,
-            rollRate = rollRate,
-            leftWheelSpeedMmPerSecond =
-                leftActualVelocity * DrivetrainConfig.millimetersPerEncoderTick,
-            rightWheelSpeedMmPerSecond =
-                rightActualVelocity * DrivetrainConfig.millimetersPerEncoderTick,
-        )
+        if (DATALOG_ENABLED) {
+            return DriveTelemetry(
+                requestedForward = forward,
+                limitedForward = smoothForward,
+                requestedTurn = turn,
+                heading = currentHeading,
+                targetHeading = targetHeading,
+                headingError = headingError,
+                headingCorrection = headingControl.correction,
+                proportionalCorrection = headingControl.proportional,
+                integralCorrection = headingControl.integral,
+                derivativeCorrection = headingControl.derivative,
+                yawRate = yawRate,
+                leftTargetVelocity = leftTargetVelocity,
+                leftActualVelocity = leftActualVelocity,
+                rightTargetVelocity = rightTargetVelocity,
+                rightActualVelocity = rightActualVelocity,
+                leftCurrentAmps = leftMotor.getCurrent(CurrentUnit.AMPS),
+                rightCurrentAmps = rightMotor.getCurrent(CurrentUnit.AMPS),
+                linearSpeedMmPerSecond = (
+                        leftActualVelocity + rightActualVelocity
+                        ) / 2.0 * DrivetrainConfig.millimetersPerEncoderTick,
+                batteryVoltage = voltageSensor.voltage,
+                headingHoldEnabled =
+                    headingHoldEnabled && allowHeadingHold,
+                leftEncoderPosition = leftMotor.currentPosition,
+                rightEncoderPosition = rightMotor.currentPosition,
+                leftMotorPower = leftMotor.power,
+                rightMotorPower = rightMotor.power,
+                pitchDegrees = pitchDegrees,
+                rollDegrees = rollDegrees,
+                pitchRate = pitchRate,
+                rollRate = rollRate,
+                leftWheelSpeedMmPerSecond =
+                    leftActualVelocity * DrivetrainConfig.millimetersPerEncoderTick,
+                rightWheelSpeedMmPerSecond =
+                    rightActualVelocity * DrivetrainConfig.millimetersPerEncoderTick,
+            )
+        }
+        else return null;
     }
 
     fun toggleHeadingHold() {

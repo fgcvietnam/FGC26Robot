@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01
+package fgc.vietnam.robot01.Config
 
 import kotlin.math.PI
 

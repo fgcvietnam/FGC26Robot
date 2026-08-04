@@ -12,7 +12,7 @@
             <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
 
             <ContinuousRotationServo name="leftIntakeServo" port="0"/>
-            <ContinuousRotationServo name="rightIntakeServo" port="1"/>
+            <ContinuousRotationServo name="rightIntakeServo" port="2"/>
 
 
 
@@ -23,12 +23,12 @@
 
         </LynxModule>
         <LynxModule name="Expansion Hub 2" port="2">
+            <RevRoboticsUltraplanetaryHDHexMotor name="intake" port="0" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="transfer" port="1" />
 
             <RevRoboticsUltraplanetaryHDHexMotor name="climbRight" port="2" />
             <RevRoboticsUltraplanetaryHDHexMotor name="climbLeft" port="3" />
 
-            <RevRoboticsUltraplanetaryHDHexMotor name="intake" port="0" />
-            <RevRoboticsUltraplanetaryHDHexMotor name="transfer" port="1" />
 
 
 <!--            <DigitalDevice name="climbMagneticSwitchSensor" port="4"/>-->

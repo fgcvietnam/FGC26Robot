@@ -1,6 +1,9 @@
-package fgc.vietnam.robot01
+package fgc.vietnam.robot01.DataLogger
 
 import com.qualcomm.robotcore.hardware.Gamepad
+import fgc.vietnam.robot01.Hardware.DriveTelemetry
+import fgc.vietnam.robot01.Hardware.FlywheelTelemetry
+import fgc.vietnam.robot01.Hardware.Intake
 
 // Full robot teleop CSV datalogger (104 columns).
 internal class TeleOpDatalogger {
@@ -206,11 +209,10 @@ internal class TeleOpDatalogger {
                 "%.4f".format(flywheel.rightShooterMotor.motorPower),
 
                 // ── Intake ──────────────────────────────────────────────────────
-                intake.hexReversed.i,
                 "%.4f".format(intake.motorPower),
                 "%.4f".format(intake.hexMotorPower),
-                "%.4f".format(intake.servo1Power),
-                "%.4f".format(intake.servo2Power),
+                "%.4f".format(intake.servoLeftPower),
+                "%.4f".format(intake.servoRightPower),
             )
         )
     }

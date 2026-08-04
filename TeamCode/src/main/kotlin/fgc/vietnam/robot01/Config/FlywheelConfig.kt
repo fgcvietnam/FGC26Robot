@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01
+package fgc.vietnam.robot01.Config
 
 import com.acmerobotics.dashboard.config.Config
 import kotlin.math.PI
@@ -10,14 +10,14 @@ internal object FlywheelConfig {
     const val GEAR_REDUCTION = 1.0
     const val MOTOR_ENCODER_TICKS_PER_REVOLUTION = 28.0
     const val WHEEL_DIAMETER_MM = 90.0
-    @JvmField var DEFAULT_RPM = 4_000.0
+    @JvmField var DEFAULT_RPM = 1_800.0
 
-    @JvmField var PIDF_P = 2.5
+    @JvmField var PIDF_P = 0.000001
     @JvmField var PIDF_I = 0.0
     @JvmField var PIDF_D = 0.0
 
     @JvmField var FF_KS = 0.0
-    @JvmField var FF_KV = 0.0
+    @JvmField var FF_KV = 0.0009
     @JvmField var FF_KA = 0.0
 
     @JvmField var ENABLE_PIDF_TUNING = false
