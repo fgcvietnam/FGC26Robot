@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
+import fgc.vietnam.robot01.Config.RobotConfig
 import fgc.vietnam.robot01.Config.FlywheelConfig
 import fgc.vietnam.robot01.Config.FlywheelConfig.DATALOG_ENABLED
 import fgc.vietnam.robot01.Config.FlywheelConfig.ENABLE_PIDF_TUNING
@@ -17,6 +18,7 @@ import fgc.vietnam.robot01.Config.FlywheelConfig.PIDF_P
 import fgc.vietnam.robot01.Utils.FeedForward
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 import kotlin.math.abs
+import kotlin.math.min
 
 internal data class FlywheelMotorTelemetry(
     val rpm: Double,
@@ -67,7 +69,7 @@ internal class Flywheel(hardwareMap: HardwareMap) {
     }
 
     private var enabled = false
-    private var targetRpm = FlywheelConfig.DEFAULT_RPM
+    private var targetVelocity = FlywheelConfig.DEFAULT_RPM
 
     fun toggle() {
         enabled = !enabled
@@ -82,17 +84,17 @@ internal class Flywheel(hardwareMap: HardwareMap) {
     }
 
 
-    private val shooterPIDF = PIDFController(
+    val shooterPIDF = PIDFController(
         kP = PIDF_P,
         kI = PIDF_I,
         kD = PIDF_D,
         FeedForward(FF_KS, FF_KV, FF_KA)
     )
 
-    fun update(): FlywheelTelemetry? {
+    fun update(batteryVoltage: Double): FlywheelTelemetry? {
         if (enabled) {
             val now = System.currentTimeMillis() / 1000.0
-            targetRpm = FlywheelConfig.DEFAULT_RPM
+            targetVelocity = FlywheelConfig.DEFAULT_RPM
 
 
             if (ENABLE_PIDF_TUNING) {
@@ -149,12 +151,15 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             }
 
             val output = shooterPIDF.calculate(
-                controlVelocity,
-                FlywheelConfig.rpmToTicksPerSecond(targetRpm)
+                abs(controlVelocity),
+                targetVelocity
             )
 
-            leftShooterMotor.power = output
-            rightShooterMotor.power = output
+            var voltageNorm: Double = RobotConfig.NOMINAL_BATTERY_VOLTAGE / batteryVoltage
+            voltageNorm = min(1.0, voltageNorm)
+
+            leftShooterMotor.power = output * voltageNorm
+            rightShooterMotor.power = output * voltageNorm
 
 
             if (DATALOG_ENABLED) {
@@ -166,17 +171,17 @@ internal class Flywheel(hardwareMap: HardwareMap) {
 
                 val allowedErrorRpm = maxOf(
                     MIN_READY_ERROR_RPM,
-                    targetRpm * READY_ERROR_RATIO
+                    targetVelocity * READY_ERROR_RATIO
                 )
 
                 return FlywheelTelemetry(
                     enabled = true,
                     atSpeed =
-                        abs(leftState.rpm - targetRpm) <= allowedErrorRpm &&
-                                abs(rightState.rpm - targetRpm) <= allowedErrorRpm,
+                        abs(leftState.rpm - targetVelocity) <= allowedErrorRpm &&
+                                abs(rightState.rpm - targetVelocity) <= allowedErrorRpm,
 
-                    targetRpm = targetRpm,
-                    targetVelocity = FlywheelConfig.rpmToTicksPerSecond(targetRpm),
+                    targetRpm = targetVelocity,
+                    targetVelocity = FlywheelConfig.rpmToTicksPerSecond(targetVelocity),
 
                     leftShooterMotor = leftState,
                     rightShooterMotor = rightState,
@@ -230,15 +235,17 @@ internal class Flywheel(hardwareMap: HardwareMap) {
 
     private fun getVelocity(motor: DcMotorEx): Double = motor.velocity
 
-    fun getTargetVelocity(): Double = targetRpm
+    fun isEnable(): Boolean = enabled;
+
+    fun getTargetVelocity(): Double = targetVelocity
 
     fun getCurrentVelocity(): Double = controlVelocity
 
     fun getPower(): Double = leftShooterMotor.power
 
-    fun atTargetVelocity(): Boolean = abs(controlVelocity - targetRpm) <= maxOf(
+    fun atTargetVelocity(): Boolean = abs(controlVelocity - targetVelocity) <= maxOf(
         MIN_READY_ERROR_RPM,
-        targetRpm * READY_ERROR_RATIO
+        targetVelocity * READY_ERROR_RATIO
     )
 
 

@@ -103,6 +103,11 @@ class PIDFController(kP: Double, kI: Double, kD: Double, var feedForward: FeedFo
 
     @get:Synchronized
     @Volatile
+    var lastPIDoutput: Double = 0.0
+        private set
+
+    @get:Synchronized
+    @Volatile
     var lastProportional: Double = 0.0
         private set
 
@@ -253,6 +258,7 @@ class PIDFController(kP: Double, kI: Double, kD: Double, var feedForward: FeedFo
 
 
         // Store telemetry data
+        lastPIDoutput = proportional + integralTerm + derivativeTerm
         lastOutput = output
         lastProportional = proportional
         lastIntegral = integralTerm
@@ -343,6 +349,32 @@ class PIDFController(kP: Double, kI: Double, kD: Double, var feedForward: FeedFo
     @Synchronized
     fun getLastError(): Double {
         return setpoint - lastMeasurement
+    }
+
+    @Synchronized
+    fun getLastPOutput(): Double {
+        return lastProportional
+    }
+
+    @Synchronized
+    fun getLastIOutput(): Double {
+        return lastIntegral
+    }
+
+    @Synchronized
+    fun getLastDOutput(): Double {
+        return lastDerivative
+    }
+
+    @Synchronized
+    fun getLastPIDOutput(): Double {
+        return lastPIDoutput
+    }
+
+
+
+    fun getFFoutput(): Double {
+        return lastFeedForward
     }
 
     /**

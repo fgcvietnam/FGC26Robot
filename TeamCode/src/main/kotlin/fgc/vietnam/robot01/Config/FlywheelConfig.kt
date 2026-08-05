@@ -12,12 +12,12 @@ internal object FlywheelConfig {
     const val WHEEL_DIAMETER_MM = 90.0
     @JvmField var DEFAULT_RPM = 1_800.0
 
-    @JvmField var PIDF_P = 0.000001
+    @JvmField var PIDF_P = 0.001
     @JvmField var PIDF_I = 0.0
-    @JvmField var PIDF_D = 0.0
+    @JvmField var PIDF_D = 0.00001
 
     @JvmField var FF_KS = 0.0
-    @JvmField var FF_KV = 0.0009
+    @JvmField var FF_KV = 0.000425
     @JvmField var FF_KA = 0.0
 
     @JvmField var ENABLE_PIDF_TUNING = false

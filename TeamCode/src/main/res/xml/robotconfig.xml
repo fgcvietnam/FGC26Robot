@@ -13,6 +13,9 @@
 
             <ContinuousRotationServo name="leftBackIntakeServo" port="0"/>
             <ContinuousRotationServo name="rightBackIntakeServo" port="2"/>
+            <RevTouchSensor name="leftLimitSwitchExtension" port="1" />
+            <RevTouchSensor name="rightLimitSwitchExtension" port="3" />
+
 
 
 
@@ -33,7 +36,6 @@
             <ContinuousRotationServo name="rightFrontIntakeServo" port="2"/>
 
 <!--            <DigitalDevice name="climbMagneticSwitchSensor" port="4"/>-->
-<!--            <DigitalDevice name="ballPusherMagneticSwitchSensor" port="6"/>-->
 
 
 
