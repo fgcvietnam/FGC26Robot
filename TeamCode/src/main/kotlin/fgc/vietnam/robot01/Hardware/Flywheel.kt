@@ -58,16 +58,6 @@ internal class Flywheel(hardwareMap: HardwareMap) {
     private var leftEncoderHealthy = true
     private var rightEncoderHealthy = true
 
-    private companion object {
-        const val ENCODER_MIN_VELOCITY = 100.0
-        const val ENCODER_MISMATCH_RATIO = 0.10      // 10%
-        const val ENCODER_MISMATCH_TIME_MS = 250L
-
-        const val READY_ERROR_RATIO = 0.05
-
-        const val MIN_READY_ERROR_RPM = 100.0
-    }
-
     private var enabled = false
     private var targetVelocity = FlywheelConfig.DEFAULT_RPM
 
@@ -88,7 +78,7 @@ internal class Flywheel(hardwareMap: HardwareMap) {
         kP = PIDF_P,
         kI = PIDF_I,
         kD = PIDF_D,
-        FeedForward(FF_KS, FF_KV, FF_KA)
+        FeedForward(FF_KS, FF_KV)
     )
 
     fun update(batteryVoltage: Double): FlywheelTelemetry? {
@@ -118,8 +108,8 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             val velocityDifference = abs(leftVelocity - rightVelocity)
 
             val allowedDifference = maxOf(
-                ENCODER_MIN_VELOCITY,
-                maxOf(leftVelocity, rightVelocity) * ENCODER_MISMATCH_RATIO
+                FlywheelConfig.ENCODER_MIN_VELOCITY,
+                maxOf(leftVelocity, rightVelocity) * FlywheelConfig.ENCODER_MISMATCH_RATIO
             )
 
             if (velocityDifference > allowedDifference) {
@@ -127,15 +117,15 @@ internal class Flywheel(hardwareMap: HardwareMap) {
                     mismatchStartTime = System.currentTimeMillis()
                 }
                 if (System.currentTimeMillis() - mismatchStartTime >
-                    ENCODER_MISMATCH_TIME_MS
+                    FlywheelConfig.ENCODER_MISMATCH_TIME_MS
                 ) {
                     leftEncoderHealthy =
-                        !(leftVelocity < ENCODER_MIN_VELOCITY &&
-                                rightVelocity > ENCODER_MIN_VELOCITY * 5)
+                        !(leftVelocity < FlywheelConfig.ENCODER_MIN_VELOCITY &&
+                                rightVelocity > FlywheelConfig.ENCODER_MIN_VELOCITY * 5)
 
                     rightEncoderHealthy =
-                        !(rightVelocity < ENCODER_MIN_VELOCITY &&
-                                leftVelocity > ENCODER_MIN_VELOCITY * 5)
+                        !(rightVelocity < FlywheelConfig.ENCODER_MIN_VELOCITY &&
+                                leftVelocity > FlywheelConfig.ENCODER_MIN_VELOCITY * 5)
                 }
 
             } else {
@@ -170,8 +160,8 @@ internal class Flywheel(hardwareMap: HardwareMap) {
                     (leftState.rpm + rightState.rpm) / 2.0
 
                 val allowedErrorRpm = maxOf(
-                    MIN_READY_ERROR_RPM,
-                    targetVelocity * READY_ERROR_RATIO
+                    FlywheelConfig.MIN_READY_ERROR_RPM,
+                    targetVelocity * FlywheelConfig.READY_ERROR_RATIO
                 )
 
                 return FlywheelTelemetry(
@@ -244,9 +234,12 @@ internal class Flywheel(hardwareMap: HardwareMap) {
     fun getPower(): Double = leftShooterMotor.power
 
     fun atTargetVelocity(): Boolean = abs(controlVelocity - targetVelocity) <= maxOf(
-        MIN_READY_ERROR_RPM,
-        targetVelocity * READY_ERROR_RATIO
+        FlywheelConfig.MIN_READY_ERROR_RPM,
+        targetVelocity * FlywheelConfig.READY_ERROR_RATIO
     )
+
+    fun getLeftShooterMotor(): DcMotorEx = leftShooterMotor
+    fun getRightShooterMotor(): DcMotorEx = rightShooterMotor
 
 
 }

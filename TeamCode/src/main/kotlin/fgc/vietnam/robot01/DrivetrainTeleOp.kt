@@ -1,22 +1,28 @@
 package fgc.vietnam.robot01
 
+import MotorTester
+import android.graphics.Color
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.hardware.lynx.LynxModule
 import com.qualcomm.robotcore.eventloop.opmode.OpMode
+import com.qualcomm.robotcore.hardware.Blinker
 import com.qualcomm.robotcore.hardware.VoltageSensor
 import com.qualcomm.robotcore.util.ElapsedTime
+import fgc.vietnam.robot01.Config.ClimbConfig
 import fgc.vietnam.robot01.Config.DrivetrainConfig
-import fgc.vietnam.robot01.Config.FlywheelConfig.ENABLE_PIDF_TUNING
-import fgc.vietnam.robot01.Config.RobotConfig
+import fgc.vietnam.robot01.Config.FlywheelConfig
+import fgc.vietnam.robot01.Config.IntakeConfig
 import fgc.vietnam.robot01.DataLogger.TeleOpDatalogger
+import fgc.vietnam.robot01.Hardware.Climb
 import fgc.vietnam.robot01.Hardware.Drivetrain
 import fgc.vietnam.robot01.Hardware.Flywheel
 import fgc.vietnam.robot01.Hardware.Intake
 import fgc.vietnam.robot01.Hardware.IntakeSlidePosition
-import fgc.vietnam.robot01.Hardware.IntakeState
+import fgc.vietnam.robot01.Hardware.ClimbState
 import org.firstinspires.ftc.robotcore.external.navigation.TempUnit
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 enum class DriveControlMode {
@@ -31,6 +37,7 @@ abstract class SharedDriveTeleOp protected constructor(
     private lateinit var drivetrain: Drivetrain
     private lateinit var flywheel: Flywheel
     private lateinit var intake: Intake
+    private lateinit var climb: Climb
     private lateinit var lynxModules: List<LynxModule>
     private val datalogger = TeleOpDatalogger()
 
@@ -47,9 +54,45 @@ abstract class SharedDriveTeleOp protected constructor(
 
     private val homingTimer = ElapsedTime()
 
+    private var motorTestTimer = ElapsedTime()
+    private var autoExtendTimer = ElapsedTime()
+    private var warningActive = false
     private var autoExtending = true
 
-    private var autoExtendTimer = ElapsedTime()
+    lateinit var intakeTester: MotorTester
+    lateinit var leftFlywheelTester: MotorTester
+    lateinit var rightFlywheelTester: MotorTester
+
+    lateinit var allHubs: List<LynxModule>
+
+    var testState = 0
+
+    private val okPattern = listOf(
+
+        Blinker.Step(Color.GREEN, 1, TimeUnit.SECONDS)
+
+    )
+
+    private val warningPattern = listOf(
+
+        Blinker.Step(Color.RED, 300, TimeUnit.MILLISECONDS),
+
+        Blinker.Step(Color.BLACK, 300, TimeUnit.MILLISECONDS),
+
+    )
+
+    private val errorPattern = listOf(
+
+        Blinker.Step(Color.RED, 150, TimeUnit.MILLISECONDS),
+
+        Blinker.Step(Color.BLACK, 150, TimeUnit.MILLISECONDS),
+
+        Blinker.Step(Color.RED, 150, TimeUnit.MILLISECONDS),
+
+        Blinker.Step(Color.BLACK, 700, TimeUnit.MILLISECONDS)
+
+    )
+
 
 
     override fun init() {
@@ -57,7 +100,7 @@ abstract class SharedDriveTeleOp protected constructor(
         drivetrain = Drivetrain(hardwareMap)
         flywheel = Flywheel(hardwareMap)
         intake = Intake(hardwareMap)
-        lynxModules = hardwareMap.getAll(LynxModule::class.java)
+        climb = Climb(hardwareMap)
         telemetry.addData(
             "Status",
             if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
@@ -67,31 +110,103 @@ abstract class SharedDriveTeleOp protected constructor(
             },
         )
         voltageSensor = hardwareMap.voltageSensor.iterator().next()
-        val allHubs = hardwareMap.getAll<LynxModule?>(LynxModule::class.java)
+        allHubs = hardwareMap.getAll(LynxModule::class.java)
         for (module in allHubs) {
-            module?.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO)
+            module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO)
+        }
+        homingTimer.reset()
+        autoExtendTimer.reset()
+
+        intakeTester = MotorTester(intake.getHexMotor()).apply {
+            expectedDirection = intake.getHexMotor().direction
+        }
+        leftFlywheelTester = MotorTester(flywheel.getLeftShooterMotor()).apply {
+            expectedDirection = flywheel.getLeftShooterMotor().direction
+        }
+        rightFlywheelTester = MotorTester(flywheel.getRightShooterMotor()).apply {
+            expectedDirection = flywheel.getRightShooterMotor().direction
         }
     }
 
     override fun init_loop() {
-        if (homingTimer.seconds() > 5.0){
-            intake.stopServos()
-            telemetry.addLine("⚠\uFE0F❌Intake Homing Timed Out ❌⚠\uFE0F")
-            if (!gamepad1.isRumbling) {
-                gamepad1.rumble(1.0,1.0,1000)
+        if (IntakeConfig.EXTENSION_HOMING){
+            if (intake.getRightIntakeSlidePosition() != IntakeSlidePosition.HOME ||
+                intake.getLeftIntakeSlidePosition() != IntakeSlidePosition.HOME
+            ) {
+                if (homingTimer.seconds() > IntakeConfig.INTAKE_HOMING_TIMEOUT_SECONDS) {
+                    intake.stopServos()
+                    telemetry.addLine("⚠️❌ Intake Homing Timed Out ❌⚠️")
+                    warningActive = true
+                } else {
+                    intake.moveServosBackward()
+                }
+            } else {
+                intake.stopServos()
+                telemetry.addLine("✅ Homing complete ✅")
             }
-            if (!gamepad2.isRumbling) {
-                gamepad2.rumble(1.0,1.0,1000)
-            }
-            return
-        }
-
-        if (intake.leftIntakeSlidePosition != IntakeSlidePosition.HOME &&
-            intake.rightIntakeSlidePosition != IntakeSlidePosition.HOME) {
-            intake.moveServosBackward()
         } else {
             intake.stopServos()
-            telemetry.addLine("✅ Homing complete ✅")
+        }
+//
+//        when(testState) {
+//
+//            0 -> {
+//                intakeTester.start()
+//                testState++
+//            }
+//
+//            1 -> {
+//                intakeTester.update()
+//                if (intakeTester.finished()) {
+//                    val result = intakeTester.result!!
+//                    telemetry.addData("Intake", result)
+//                    if (!result.passed) {
+//                        warningRumbling = true
+//                    }
+//                    testState++
+//                }
+//            }
+//
+//            2 -> {
+//                leftFlywheelTester.start()
+//                testState++
+//            }
+//
+//            3 -> {
+//                leftFlywheelTester.update()
+//
+//                if (leftFlywheelTester.finished()) {
+//                    val result = intakeTester.result!!
+//                    telemetry.addData("Flywheel L", leftFlywheelTester.result)
+//                    testState++
+//                }
+//            }
+//
+//            4 -> {
+//                rightFlywheelTester.start()
+//                testState++
+//            }
+//
+//            5 -> {
+//                rightFlywheelTester.update()
+//
+//                if (rightFlywheelTester.finished()) {
+//                    telemetry.addData("Flywheel R", rightFlywheelTester.result)
+//                }
+//                testState = -1
+//            }
+//        }
+
+
+
+        if (warningActive) {
+            setWarning(true)
+            if (!gamepad1.isRumbling) {
+                gamepad1.rumble(1.0, 1.0, 1000)
+            }
+            if (!gamepad2.isRumbling) {
+                gamepad2.rumble(1.0, 1.0, 1000)
+            }
         }
     }
 
@@ -116,9 +231,9 @@ abstract class SharedDriveTeleOp protected constructor(
         }
         previousHeadingToggle = headingToggle
 
-        val combinedRightStickY = -(gamepad1.right_stick_y.toDouble() + gamepad2.right_stick_y.toDouble())
-        val combinedRightStickX = -(gamepad1.right_stick_x.toDouble() + gamepad2.right_stick_x.toDouble())
-        val combinedLeftStickY = -(gamepad1.left_stick_y.toDouble() + gamepad2.left_stick_y.toDouble())
+        val combinedRightStickY = -gamepad1.right_stick_y.toDouble()
+        val combinedRightStickX = -gamepad1.right_stick_x.toDouble()
+        val combinedLeftStickY = -gamepad1.left_stick_y.toDouble()
 
         val forwardInput = deadband(combinedRightStickY).coerceIn(-1.0, 1.0)
         val turnInput = deadband(combinedRightStickX).coerceIn(-1.0, 1.0)
@@ -156,7 +271,7 @@ abstract class SharedDriveTeleOp protected constructor(
         }
 
         when {
-            intake.state == IntakeState.OFF -> intake.stopMotor()
+            intake.getIntakeState() == ClimbState.OFF -> intake.stopMotor()
             isTransferring -> intake.transfer(flywheel.atTargetVelocity())
             isOuttaking -> intake.outtake()
             else -> intake.intake()
@@ -167,10 +282,10 @@ abstract class SharedDriveTeleOp protected constructor(
             }
         }
 
-        if (autoExtending) {
-            intake.moveServosBackward()
+        if (autoExtending && IntakeConfig.ENABLE_AUTO_EXTENDING) {
+            intake.moveServosForward()
 
-            if (autoExtendTimer.seconds() >= RobotConfig.AUTO_EXTEND_TIME_SECONDS) {
+            if (autoExtendTimer.seconds() >= IntakeConfig.AUTO_EXTEND_TIME_SECONDS) {
                 intake.stopServos()
                 autoExtending = false
             }
@@ -187,6 +302,25 @@ abstract class SharedDriveTeleOp protected constructor(
 
         val flywheelState = flywheel.update(voltageSensor.voltage)
 
+        val climbInput = gamepad1.right_trigger - gamepad1.left_trigger
+
+        val power = abs(climbInput / ClimbConfig.CUT_OFF_INPUT).coerceAtMost(1.0)
+
+        if (climbInput > ClimbConfig.TRIGGER_DEADBAND){
+            climb.climbForward(power)
+        } else if (climbInput < ClimbConfig.TRIGGER_DEADBAND){
+            climb.climbBackward(power)
+        } else {
+            climb.stop()
+        }
+
+        if (gamepad1.triangleWasPressed() || gamepad2.triangleWasPressed()){
+            climb.climbExtend()
+        } else {
+            climb.climbExtendStop()
+        }
+
+
 
         // Performance metrics (calculate once, use multiple times)
         val loopTimeMs: Double = (getRuntime() - loopStartTime) * 1000.0
@@ -194,7 +328,7 @@ abstract class SharedDriveTeleOp protected constructor(
 
         telemetry.addData("Loop Time", String.format(Locale.US,"%.1f ms", loopTimeMs))
 
-        if (ENABLE_PIDF_TUNING){
+        if (FlywheelConfig.ENABLE_PIDF_TUNING){
             packet.put("Target Velocity", flywheel.getTargetVelocity())
             packet.put("Current Velocity", flywheel.getCurrentVelocity())
             packet.put("At Target Velocity", flywheel.atTargetVelocity())
@@ -203,8 +337,18 @@ abstract class SharedDriveTeleOp protected constructor(
             packet.put("last P output", flywheel.shooterPIDF.getLastPOutput())
             packet.put("last PID output", flywheel.shooterPIDF.getLastPIDOutput())
             packet.put("last FF output", flywheel.shooterPIDF.getFFoutput())
-
         }
+        if (IntakeConfig.ENABLE_LIMIT_SWITCH_AND_MAGNETIC_TESTING){
+            packet.put("Right Limit Switch is Pressed", intake.rightLimitSwitchIsPressed())
+            packet.put("Left Limit Switch is Pressed", intake.leftLimitSwitchIsPressed())
+            packet.put("Right Intake Slide State ", intake.getRightIntakeSlidePosition().name)
+            packet.put("Left Intake Slide State ", intake.getLeftIntakeSlidePosition().name)
+            packet.put("Servo Right Below Power", intake.servoRightBelowPower)
+            packet.put("Servo Right Above Power", intake.servoRightAbovePower)
+            packet.put("Servo Left Below Power", intake.servoLeftBelowPower)
+            packet.put("Servo Left Above Power", intake.servoLeftAbovePower)
+        }
+
         dashboard.sendTelemetryPacket(packet)
 
         if (drive != null) {
@@ -322,7 +466,7 @@ abstract class SharedDriveTeleOp protected constructor(
             telemetry.addData(
                 "Intake",
                 "state=%s hex=%s",
-                intake.state,
+                intake.getIntakeState(),
             )
             if (controlMode == DriveControlMode.ARCADE || controlMode == DriveControlMode.SPLIT_ARCADE) {
                 telemetry.addData(
@@ -348,10 +492,13 @@ abstract class SharedDriveTeleOp protected constructor(
     }
 
     private fun deadband(value: Double): Double =
-        if (abs(value) < JOYSTICK_DEADBAND) 0.0 else value
+        if (abs(value) < DrivetrainConfig.JOYSTICK_DEADBAND) 0.0 else value
 
-    private companion object {
-        const val JOYSTICK_DEADBAND = 0.05
+    fun setWarning(active: Boolean) {
+        if (active == warningActive) return
+        warningActive = active
+        val pattern = if (active) warningPattern else okPattern
+        allHubs.forEach { it.setPattern(pattern) }
     }
 }
 

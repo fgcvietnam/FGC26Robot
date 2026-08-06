@@ -23,6 +23,14 @@ internal object FlywheelConfig {
     @JvmField var ENABLE_PIDF_TUNING = false
 
     @JvmField var DATALOG_ENABLED = false
+
+    const val ENCODER_MIN_VELOCITY = 100.0
+    const val ENCODER_MISMATCH_RATIO = 0.10      // 10%
+    const val ENCODER_MISMATCH_TIME_MS = 250L
+
+    const val READY_ERROR_RATIO = 0.05
+
+    const val MIN_READY_ERROR_RPM = 100.0
     val encoderTicksPerWheelRevolution = MOTOR_ENCODER_TICKS_PER_REVOLUTION * GEAR_REDUCTION
 
     fun rpmToTicksPerSecond(rpm: Double) = rpm * encoderTicksPerWheelRevolution / 60.0

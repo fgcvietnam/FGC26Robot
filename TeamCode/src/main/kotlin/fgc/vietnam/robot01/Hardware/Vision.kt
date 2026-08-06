@@ -9,7 +9,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
 
 
-class Vision(hardwareMap: HardwareMap) {
+internal class Vision(hardwareMap: HardwareMap) {
     private val aprilTag: AprilTagProcessor = AprilTagProcessor.Builder()
         .build()
     private val portal: VisionPortal? = VisionPortal.Builder()

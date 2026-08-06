@@ -1,7 +1,13 @@
 package fgc.vietnam.robot01.Config
 
+import com.acmerobotics.dashboard.config.Config
+
+@Config
 object RobotConfig {
-    const val AUTO_EXTEND_TIME_SECONDS = 3
-    const val NOMINAL_BATTERY_VOLTAGE = 12
+    @JvmField var NOMINAL_BATTERY_VOLTAGE = 12
+
+
+
+
 
 }

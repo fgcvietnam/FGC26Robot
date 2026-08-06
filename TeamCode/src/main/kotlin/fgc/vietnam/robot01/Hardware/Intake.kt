@@ -3,61 +3,74 @@ package fgc.vietnam.robot01.Hardware
 import com.qualcomm.hardware.rev.RevTouchSensor
 import com.qualcomm.robotcore.hardware.CRServo
 import com.qualcomm.robotcore.hardware.DcMotor
+import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 
-enum class IntakeState { OFF, INTAKE, OUTTAKE, TRANSFER }
+enum class ClimbState { OFF, INTAKE, OUTTAKE, TRANSFER }
 enum class IntakeSlidePosition { HOME, EXTENDED, EXTENDING, UNKNOWN }
 
 internal class Intake(hardwareMap: HardwareMap) {
 
-    var leftIntakeSlidePosition: IntakeSlidePosition = IntakeSlidePosition.UNKNOWN
+    private var leftIntakeSlidePosition: IntakeSlidePosition = IntakeSlidePosition.UNKNOWN
 
-    var rightIntakeSlidePosition: IntakeSlidePosition = IntakeSlidePosition.UNKNOWN
+    private var rightIntakeSlidePosition: IntakeSlidePosition = IntakeSlidePosition.UNKNOWN
 
-    private val motor = hardwareMap.get(DcMotor::class.java, "intake").apply {
+    private val motor = hardwareMap.get(DcMotorEx::class.java, "intake").apply {
         direction = DcMotorSimple.Direction.REVERSE
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        setCurrentAlert(5.0, CurrentUnit.AMPS)
         power = 0.0
     }
 
-    private val hexMotor = hardwareMap.get(DcMotor::class.java, "transfer").apply {
+    private val hexMotor = hardwareMap.get(DcMotorEx::class.java, "transfer").apply {
         direction = DcMotorSimple.Direction.FORWARD
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
+        setCurrentAlert(5.0, CurrentUnit.AMPS)
         power = 0.0
     }
 
-    private val servoRightBack = hardwareMap.get(CRServo::class.java, "leftBackIntakeServo").apply {
+    private val servoLeftBelow = hardwareMap.get(CRServo::class.java, "leftBelowIntakeServo").apply {
         direction = DcMotorSimple.Direction.REVERSE
     }
-    private val servoLeftBack = hardwareMap.get(CRServo::class.java, "rightBackIntakeServo").apply {
+    private val servoRightBelow = hardwareMap.get(CRServo::class.java, "rightBelowIntakeServo").apply {
         direction = DcMotorSimple.Direction.FORWARD
     }
 
-    private val servoRightFront = hardwareMap.get(CRServo::class.java, "leftFrontIntakeServo").apply {
+    private val servoLeftAbove = hardwareMap.get(CRServo::class.java, "leftAboveIntakeServo").apply {
         direction = DcMotorSimple.Direction.FORWARD
     }
-    private val servoLeftFront = hardwareMap.get(CRServo::class.java, "rightFrontIntakeServo").apply {
+    private val servoRightAbove = hardwareMap.get(CRServo::class.java, "rightAboveIntakeServo").apply {
         direction = DcMotorSimple.Direction.REVERSE
     }
 
     private val leftLimitSwitch = hardwareMap.get(RevTouchSensor::class.java, "leftLimitSwitchExtension")
     private val rightLimitSwitch = hardwareMap.get(RevTouchSensor::class.java, "rightLimitSwitchExtension")
 
-    var state: IntakeState = IntakeState.INTAKE
+    private val rightMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "rightMagneticSwitchExtension")
+    private val leftMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "leftMagneticSwitchExtension")
+    private var state: ClimbState = ClimbState.INTAKE
+
+    val motorPower: Double get() = motor.power
+    val hexMotorPower: Double get() = hexMotor.power
+    val servoRightBelowPower: Double get() = servoRightBelow.power
+    val servoLeftBelowPower: Double get() = servoLeftBelow.power
+    val servoRightAbovePower: Double get() = servoRightAbove.power
+    val servoLeftAbovePower: Double get() = servoLeftAbove.power
     fun intake() {
         motor.power = 1.0
         hexMotor.power = 0.0
-        state = IntakeState.INTAKE
+        state = ClimbState.INTAKE
     }
 
 
     fun outtake() {
         motor.power = -1.0
         hexMotor.power = -1.0
-        state = IntakeState.OUTTAKE
+        state = ClimbState.OUTTAKE
     }
 
     fun transfer(shooterReady: Boolean) {
@@ -66,67 +79,88 @@ internal class Intake(hardwareMap: HardwareMap) {
         } else {
             hexMotor.power = 0.0
         }
-//        moveServosBackward()
-        state = IntakeState.TRANSFER
+        state = ClimbState.TRANSFER
     }
 
     fun stopMotor() {
         motor.power = 0.0;
         hexMotor.power = 0.0
-        state = IntakeState.OFF
+        state = ClimbState.OFF
     }
 
     fun toggle(){
-        if (state == IntakeState.OFF) {
+        if (state == ClimbState.OFF) {
             motor.power = 1.0
             hexMotor.power = 1.0
-            state = IntakeState.INTAKE
+            state = ClimbState.INTAKE
         } else {
             motor.power = 0.0
             hexMotor.power = 0.0
-            state = IntakeState.OFF
+            state = ClimbState.OFF
         }
     }
 
-    val motorPower: Double get() = motor.power
-    val hexMotorPower: Double get() = hexMotor.power
-    val servoRightPower: Double get() = servoRightBack.power
-    val servoLeftPower: Double get() = servoLeftBack.power
-    
+
     fun moveServosForward() {
-        servoRightBack.power = 1.0
-        servoLeftBack.power = 1.0
-        servoRightFront.power = 1.0
-        servoLeftFront.power = 1.0
+        servoLeftBelow.power = 1.0
+        servoRightBelow.power = 1.0
+        servoLeftAbove.power = 1.0
+        servoRightAbove.power = 1.0
         leftIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
         rightIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
 
     }
 
     fun moveServosBackward() {
-        if (leftLimitSwitch.isPressed) {
-            servoLeftBack.power = 0.0
-            servoLeftFront.power = 0.0
+        if (rightLimitSwitch.isPressed) {
+            servoRightBelow.power = 0.0
+            servoRightAbove.power = 0.0
             leftIntakeSlidePosition = IntakeSlidePosition.HOME;
         } else {
-            servoLeftBack.power = -1.0
-            servoLeftFront.power = -1.0
+            servoRightBelow.power = -1.0
+            servoRightAbove.power = -1.0
+            leftIntakeSlidePosition = IntakeSlidePosition.UNKNOWN;
+
         }
 
-        if (rightLimitSwitch.isPressed) {
-            servoRightBack.power = 0.0
-            servoRightFront.power = 0.0
+        if (leftLimitSwitch.isPressed) {
+            servoLeftBelow.power = 0.0
+            servoLeftAbove.power = 0.0
             rightIntakeSlidePosition = IntakeSlidePosition.HOME;
         } else {
-            servoRightBack.power = -1.0
-            servoRightFront.power = -1.0
+            servoLeftBelow.power = -1.0
+            servoLeftAbove.power = -1.0
+            rightIntakeSlidePosition = IntakeSlidePosition.UNKNOWN;
         }
     }
 
     fun stopServos() {
-        servoRightBack.power = 0.0
-        servoLeftBack.power = 0.0
-        servoRightFront.power = 0.0
-        servoLeftFront.power = 0.0
+        servoLeftBelow.power = 0.0
+        servoRightBelow.power = 0.0
+        servoLeftAbove.power = 0.0
+        servoRightAbove.power = 0.0
+    }
+
+    fun rightLimitSwitchIsPressed(): Boolean {
+        return rightLimitSwitch.isPressed
+    }
+
+    fun leftLimitSwitchIsPressed(): Boolean {
+        return leftLimitSwitch.isPressed
+    }
+
+    fun getIntakeState(): ClimbState {
+        return state
+    }
+
+    fun getLeftIntakeSlidePosition(): IntakeSlidePosition {
+        return leftIntakeSlidePosition
+    }
+    fun getRightIntakeSlidePosition(): IntakeSlidePosition {
+        return rightIntakeSlidePosition
+    }
+
+    fun getHexMotor(): DcMotorEx {
+        return hexMotor
     }
 }

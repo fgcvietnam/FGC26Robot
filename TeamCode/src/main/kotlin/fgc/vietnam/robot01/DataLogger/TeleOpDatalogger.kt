@@ -211,8 +211,8 @@ internal class TeleOpDatalogger {
                 // ── Intake ──────────────────────────────────────────────────────
                 "%.4f".format(intake.motorPower),
                 "%.4f".format(intake.hexMotorPower),
-                "%.4f".format(intake.servoLeftPower),
-                "%.4f".format(intake.servoRightPower),
+                "%.4f".format(intake.servoLeftBelowPower),
+                "%.4f".format(intake.servoRightBelowPower),
             )
         )
     }

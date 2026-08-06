@@ -10,7 +10,8 @@ import kotlin.math.sign
 class FeedForward(
     var kS: Double = 0.0,
     var kV: Double = 0.0,
-    var kA: Double = 0.0
+    var kA: Double = 0.0,
+    var kG: Double = 0.0
 ) {
     /**
      * Calculates the feedforward output.
@@ -21,6 +22,10 @@ class FeedForward(
      */
     fun calculate(targetVelocity: Double, targetAcceleration: Double = 0.0): Double {
         val staticFriction = if (targetVelocity != 0.0) sign(targetVelocity) * kS else 0.0
-        return staticFriction + (kV * targetVelocity) + (kA * targetAcceleration)
+
+        return kG +
+                staticFriction +
+                (kV * targetVelocity) +
+                (kA * targetAcceleration)
     }
 }
