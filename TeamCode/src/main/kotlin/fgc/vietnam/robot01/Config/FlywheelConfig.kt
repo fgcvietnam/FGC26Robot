@@ -22,7 +22,6 @@ internal object FlywheelConfig {
 
     @JvmField var ENABLE_PIDF_TUNING = false
 
-    @JvmField var DATALOG_ENABLED = false
 
     const val ENCODER_MIN_VELOCITY = 100.0
     const val ENCODER_MISMATCH_RATIO = 0.10      // 10%

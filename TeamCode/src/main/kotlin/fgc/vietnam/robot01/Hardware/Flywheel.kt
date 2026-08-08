@@ -7,7 +7,6 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import fgc.vietnam.robot01.Config.RobotConfig
 import fgc.vietnam.robot01.Config.FlywheelConfig
-import fgc.vietnam.robot01.Config.FlywheelConfig.DATALOG_ENABLED
 import fgc.vietnam.robot01.Config.FlywheelConfig.ENABLE_PIDF_TUNING
 import fgc.vietnam.robot01.Config.FlywheelConfig.FF_KA
 import fgc.vietnam.robot01.Config.FlywheelConfig.FF_KS
@@ -15,6 +14,7 @@ import fgc.vietnam.robot01.Config.FlywheelConfig.FF_KV
 import fgc.vietnam.robot01.Config.FlywheelConfig.PIDF_D
 import fgc.vietnam.robot01.Config.FlywheelConfig.PIDF_I
 import fgc.vietnam.robot01.Config.FlywheelConfig.PIDF_P
+import fgc.vietnam.robot01.Config.RobotConfig.DATALOG_ENABLED
 import fgc.vietnam.robot01.Utils.FeedForward
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 import kotlin.math.abs

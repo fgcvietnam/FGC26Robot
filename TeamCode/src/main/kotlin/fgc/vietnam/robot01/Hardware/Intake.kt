@@ -6,10 +6,12 @@ import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
+import com.qualcomm.robotcore.util.ElapsedTime
+import fgc.vietnam.robot01.Config.IntakeConfig
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 
-enum class ClimbState { OFF, INTAKE, OUTTAKE, TRANSFER }
-enum class IntakeSlidePosition { HOME, EXTENDED, EXTENDING, UNKNOWN }
+enum class IntakeState { OFF, INTAKE, OUTTAKE, TRANSFER}
+enum class IntakeSlidePosition { HOME, EXTENDED, EXTENDING, RETRACTING, UNKNOWN }
 
 internal class Intake(hardwareMap: HardwareMap) {
 
@@ -52,7 +54,7 @@ internal class Intake(hardwareMap: HardwareMap) {
 
     private val rightMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "rightMagneticSwitchExtension")
     private val leftMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "leftMagneticSwitchExtension")
-    private var state: ClimbState = ClimbState.INTAKE
+    private var state: IntakeState = IntakeState.INTAKE
 
     val motorPower: Double get() = motor.power
     val hexMotorPower: Double get() = hexMotor.power
@@ -60,17 +62,29 @@ internal class Intake(hardwareMap: HardwareMap) {
     val servoLeftBelowPower: Double get() = servoLeftBelow.power
     val servoRightAbovePower: Double get() = servoRightAbove.power
     val servoLeftAbovePower: Double get() = servoLeftAbove.power
+    private val leftMagnetTimer = ElapsedTime()
+    private val rightMagnetTimer = ElapsedTime()
+    private var leftMagnetTiming = false
+    private var rightMagnetTiming = false
+    private var intakeJamTimer = ElapsedTime()
+    private var transferJamTimer = ElapsedTime()
+    private var unjamTimer = ElapsedTime()
+    private var intakeJamTiming = false
+    private var transferJamTiming = false
+
+    private var unjamming = false
+
     fun intake() {
         motor.power = 1.0
         hexMotor.power = 0.0
-        state = ClimbState.INTAKE
+        state = IntakeState.INTAKE
     }
 
 
     fun outtake() {
         motor.power = -1.0
         hexMotor.power = -1.0
-        state = ClimbState.OUTTAKE
+        state = IntakeState.OUTTAKE
     }
 
     fun transfer(shooterReady: Boolean) {
@@ -79,35 +93,104 @@ internal class Intake(hardwareMap: HardwareMap) {
         } else {
             hexMotor.power = 0.0
         }
-        state = ClimbState.TRANSFER
+        state = IntakeState.TRANSFER
     }
 
     fun stopMotor() {
         motor.power = 0.0;
         hexMotor.power = 0.0
-        state = ClimbState.OFF
+        state = IntakeState.OFF
     }
 
     fun toggle(){
-        if (state == ClimbState.OFF) {
+        if (state == IntakeState.OFF) {
             motor.power = 1.0
             hexMotor.power = 1.0
-            state = ClimbState.INTAKE
-        } else {
+            state = IntakeState.INTAKE
+        } else if (state != IntakeState.OFF) {
             motor.power = 0.0
             hexMotor.power = 0.0
-            state = ClimbState.OFF
+            state = IntakeState.OFF
         }
+    }
+
+    fun update() {
+        if (leftMagneticSwitch.isPressed) {
+            if (!leftMagnetTiming) {
+                leftMagnetTimer.reset()
+                leftMagnetTiming = true
+            }
+        } else {
+            leftMagnetTiming = false
+        }
+
+        if (rightMagneticSwitch.isPressed) {
+            if (!rightMagnetTiming) {
+                rightMagnetTimer.reset()
+                rightMagnetTiming = true
+            }
+        } else {
+            rightMagnetTiming = false
+        }
+
+        if (motor.isOverCurrent) {
+            if (!intakeJamTiming) {
+                intakeJamTimer.reset()
+                intakeJamTiming = true
+            }
+        } else {
+            intakeJamTiming = false
+        }
+
+        if (hexMotor.isOverCurrent) {
+            if (!transferJamTiming) {
+                transferJamTimer.reset()
+                transferJamTiming = true
+            }
+        } else {
+            transferJamTiming = false
+        }
+
+        if (intakeJamConfirm() && !unjamming) {
+            unjamming = true
+            unjamTimer.reset()
+            motor.power = 0.0
+        }
+
+//        if (unjamTimer.milliseconds() >= IntakeConfig.INTAKE_UNJAM_DELAY_MS){
+//            unjamming = false
+//        }
+//
+//        if (unjamming) {
+//            if (unjamTimer.milliseconds() < IntakeConfig.INTAKE_UNJAM_DELAY_MS) {
+//                motor.power = 0.0      // or reverse
+//            } else {
+//                unjamming = false
+//            }
+//        }
     }
 
 
     fun moveServosForward() {
-        servoLeftBelow.power = 1.0
-        servoRightBelow.power = 1.0
-        servoLeftAbove.power = 1.0
-        servoRightAbove.power = 1.0
-        leftIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
-        rightIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
+        if (rightMagnetConfirmed()) {
+            servoRightBelow.power = 0.0
+            servoRightAbove.power = 0.0
+            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDED;
+        } else {
+            servoRightBelow.power = 1.0
+            servoRightAbove.power = 1.0
+            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
+        }
+
+        if (leftMagnetConfirmed()) {
+            servoLeftBelow.power = 0.0
+            servoLeftAbove.power = 0.0
+            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDED;
+        } else {
+            servoLeftBelow.power = 1.0
+            servoLeftAbove.power = 1.0
+            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
+        }
 
     }
 
@@ -119,18 +202,16 @@ internal class Intake(hardwareMap: HardwareMap) {
         } else {
             servoRightBelow.power = -1.0
             servoRightAbove.power = -1.0
-            leftIntakeSlidePosition = IntakeSlidePosition.UNKNOWN;
-
+            leftIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
         }
-
         if (leftLimitSwitch.isPressed) {
             servoLeftBelow.power = 0.0
             servoLeftAbove.power = 0.0
-            rightIntakeSlidePosition = IntakeSlidePosition.HOME;
+            leftIntakeSlidePosition = IntakeSlidePosition.HOME;
         } else {
             servoLeftBelow.power = -1.0
             servoLeftAbove.power = -1.0
-            rightIntakeSlidePosition = IntakeSlidePosition.UNKNOWN;
+            leftIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
         }
     }
 
@@ -149,7 +230,7 @@ internal class Intake(hardwareMap: HardwareMap) {
         return leftLimitSwitch.isPressed
     }
 
-    fun getIntakeState(): ClimbState {
+    fun getIntakeState(): IntakeState {
         return state
     }
 
@@ -163,4 +244,26 @@ internal class Intake(hardwareMap: HardwareMap) {
     fun getHexMotor(): DcMotorEx {
         return hexMotor
     }
+    fun leftMagnetConfirmed(): Boolean {
+        return leftMagnetTiming &&
+                leftMagnetTimer.milliseconds() >= IntakeConfig.MAGNETIC_SWITCH_CONFIRM_DELAY_MS
+    }
+
+    fun rightMagnetConfirmed(): Boolean {
+        return rightMagnetTiming &&
+                rightMagnetTimer.milliseconds() >= IntakeConfig.MAGNETIC_SWITCH_CONFIRM_DELAY_MS
+    }
+
+    fun intakeJamConfirm(): Boolean {
+        return intakeJamTiming &&
+                intakeJamTimer.milliseconds() >= IntakeConfig.INTAKE_JAM_DETECTION_DELAY_MS
+    }
+
+    fun transferJamConfirmed(): Boolean {
+        return transferJamTiming &&
+                transferJamTimer.milliseconds() >= IntakeConfig.INTAKE_JAM_DETECTION_DELAY_MS
+    }
+
+    fun isUnjamming() = unjamming
+
 }

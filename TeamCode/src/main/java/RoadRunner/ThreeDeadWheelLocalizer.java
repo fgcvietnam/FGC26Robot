@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.RoadRunner;
+package RoadRunner;
 
 import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.roadrunner.DualNum;
@@ -16,10 +16,9 @@ import com.acmerobotics.roadrunner.ftc.RawEncoder;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import RoadRunner.messages.ThreeDeadWheelInputsMessage;
 
-import fgc.vietnam.robot01.RoadRunner.messages.ThreeDeadWheelInputsMessage;
 
-@Config
 public final class ThreeDeadWheelLocalizer implements Localizer {
     public static class Params {
         public double par0YTicks = 0.0; // y position of the first parallel encoder (in tick units)

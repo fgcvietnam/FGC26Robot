@@ -16,6 +16,7 @@ android {
 
 dependencies {
     implementation project(':FtcRobotController')
+    implementation files('lib/IgnitingInnovationAprilTagLibrary-1.0.jar')
 }
 
 kotlin {

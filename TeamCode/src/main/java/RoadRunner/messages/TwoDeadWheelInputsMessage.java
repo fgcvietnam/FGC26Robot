@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.RoadRunner.messages;
+package RoadRunner.messages;
 
 import com.acmerobotics.roadrunner.ftc.PositionVelocityPair;
 

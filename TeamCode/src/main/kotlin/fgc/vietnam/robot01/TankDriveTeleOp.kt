@@ -2,14 +2,8 @@ package fgc.vietnam.robot01
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 
-@TeleOp(name = "FGC: Tank Drive", group = "FGC Vietnam")
-class TankDriveTeleOp :
-    SharedDriveTeleOp(DriveControlMode.TANK)
+@TeleOp(name = "BLUE: Competition teleop", group = "FGC Vietnam")
+class BlueCompTeleOp : CompDriveTeleOp(Alliance.BLUE)
 
-@TeleOp(name = "FGC: Arcade Drive", group = "FGC Vietnam")
-class DrivetrainTeleOp :
-    SharedDriveTeleOp(DriveControlMode.ARCADE)
-
-@TeleOp(name = "FGC: Split Arcade Drive", group = "FGC Vietnam")
-class DrivetrainSplitArcadeTeleOp :
-    SharedDriveTeleOp(DriveControlMode.SPLIT_ARCADE)
+@TeleOp(name = "RED: Competition teleop", group = "FGC Vietnam")
+class RedCompTeleOp : CompDriveTeleOp(Alliance.RED)
