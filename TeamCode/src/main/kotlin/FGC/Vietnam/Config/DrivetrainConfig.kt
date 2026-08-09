@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.Config
+package FGC.Vietnam.Config
 
 import com.acmerobotics.dashboard.config.Config
 import kotlin.math.PI
@@ -38,6 +38,8 @@ internal object DrivetrainConfig {
     // Active Heading Correction
     @JvmField var ENABLE_ACTIVE_HEADING_TUNING = false
     @JvmField var ENABLE_ACTIVE_HEADING_CORRECTION = true
+
+    @JvmField var LOCALIZER_ENABLE = true
     @JvmField var ACTIVE_HEADING_KP = 3.0
     @JvmField var ACTIVE_HEADING_KI = 2.0
     @JvmField var ACTIVE_HEADING_KD = 0.4

@@ -7,7 +7,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.util.ElapsedTime
-import fgc.vietnam.robot01.Config.IntakeConfig
+import FGC.Vietnam.Config.IntakeConfig
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 
 enum class IntakeState { OFF, INTAKE, OUTTAKE, TRANSFER}
@@ -151,12 +151,12 @@ internal class Intake(hardwareMap: HardwareMap) {
             transferJamTiming = false
         }
 
-        if (intakeJamConfirm() && !unjamming) {
-            unjamming = true
-            unjamTimer.reset()
-            motor.power = 0.0
-        }
-
+//        if (intakeJamConfirm() && !unjamming) {
+//            unjamming = true
+//            unjamTimer.reset()
+//            motor.power = 0.0
+//        }
+//
 //        if (unjamTimer.milliseconds() >= IntakeConfig.INTAKE_UNJAM_DELAY_MS){
 //            unjamming = false
 //        }
@@ -198,11 +198,11 @@ internal class Intake(hardwareMap: HardwareMap) {
         if (rightLimitSwitch.isPressed) {
             servoRightBelow.power = 0.0
             servoRightAbove.power = 0.0
-            leftIntakeSlidePosition = IntakeSlidePosition.HOME;
+            rightIntakeSlidePosition = IntakeSlidePosition.HOME;
         } else {
             servoRightBelow.power = -1.0
             servoRightAbove.power = -1.0
-            leftIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
+            rightIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
         }
         if (leftLimitSwitch.isPressed) {
             servoLeftBelow.power = 0.0
@@ -253,6 +253,15 @@ internal class Intake(hardwareMap: HardwareMap) {
         return rightMagnetTiming &&
                 rightMagnetTimer.milliseconds() >= IntakeConfig.MAGNETIC_SWITCH_CONFIRM_DELAY_MS
     }
+
+    fun leftMagnetRegistered(): Boolean {
+        return leftMagneticSwitch.isPressed
+    }
+
+    fun rightMagnetRegistered(): Boolean {
+        return rightMagneticSwitch.isPressed
+    }
+
 
     fun intakeJamConfirm(): Boolean {
         return intakeJamTiming &&

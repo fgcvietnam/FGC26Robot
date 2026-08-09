@@ -1,25 +1,23 @@
-package fgc.vietnam.robot01.Hardware
-
-import TeamVietnam.control.PIDFController
 import com.qualcomm.hardware.rev.Rev2mDistanceSensor
 import com.qualcomm.robotcore.hardware.CRServo
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
-import com.qualcomm.robotcore.hardware.DistanceSensor
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.util.ElapsedTime
-import fgc.vietnam.robot01.Config.ClimbConfig
-import fgc.vietnam.robot01.Utils.FeedForward
+import FGC.Vietnam.Config.ClimbConfig
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
-import kotlin.math.abs
 
 internal class Climb(hardwareMap: HardwareMap) {
 
     enum class ClimbState { CLIMBING, STOPPED, RETRACTING }
 
-    private val holdTimer = ElapsedTime()
+    private val holdPowerTimer = ElapsedTime()
     private var shouldHold = false
+    private var holdPower = 0.0
+
+    private val holdInputTimer = ElapsedTime()
+    private var previousHoldInput = false
 
     private val motorAbove = hardwareMap.get(DcMotorEx::class.java, "climbAbove").apply {
         direction = DcMotorSimple.Direction.FORWARD
@@ -44,12 +42,12 @@ internal class Climb(hardwareMap: HardwareMap) {
     private var state: ClimbState = ClimbState.STOPPED
 
 
-    fun climbForward(inputPower: Double) {
+    fun climbForward(inputPower: Float) {
         motorAbove.power = 1.0 * inputPower
         motorBelow.power = 1.0 * inputPower
 
         shouldHold = true
-        holdTimer.reset()
+        holdPowerTimer.reset()
 
         state = ClimbState.CLIMBING
     }
@@ -62,15 +60,15 @@ internal class Climb(hardwareMap: HardwareMap) {
     }
 
     fun stop() {
-        if (shouldHold && holdTimer.milliseconds() >= ClimbConfig.HOLD_DELAY_CONFIRM_MS) {
-            motorAbove.power = ClimbConfig.HOLD_STOP_POWER
-            motorBelow.power = ClimbConfig.HOLD_STOP_POWER
+        if (shouldHold && holdPower >= ClimbConfig.HOLD_STOP_POWER) {
+            motorAbove.power = holdPower
+            motorBelow.power = holdPower
         } else {
             motorAbove.power = 0.0
             motorBelow.power = 0.0
         }
-        state = ClimbState.STOPPED
 
+        state = ClimbState.STOPPED
     }
 
     fun climbExtend(){
@@ -90,17 +88,30 @@ internal class Climb(hardwareMap: HardwareMap) {
 
     fun getDistance(): Double = distanceSensor.getDistance(DistanceUnit.MM)
 
-    fun toggle() {
-        if (state != ClimbState.CLIMBING) {
-            motorAbove.power = 1.0
-            motorBelow.power = 1.0
-            state = ClimbState.CLIMBING
-        } else if (state == ClimbState.CLIMBING) {
-            if (motorAbove.power != ClimbConfig.HOLD_STOP_POWER) motorAbove.power = ClimbConfig.HOLD_STOP_POWER
-            if (motorBelow.power != ClimbConfig.HOLD_STOP_POWER) motorBelow.power = ClimbConfig.HOLD_STOP_POWER
-            state = ClimbState.RETRACTING
-        }
+    fun getHoldPower(holdTimeSeconds: Double): Double {
+        return (
+                ClimbConfig.HOLD_STOP_POWER +
+                        holdTimeSeconds * ClimbConfig.HOLD_POWER_INCREASE_PER_SECOND
+                ).coerceAtMost(ClimbConfig.MAX_HOLD_POWER)
     }
+
+    fun updateHoldPower(leftTrigger: Float) {
+        val pressed = leftTrigger > ClimbConfig.TRIGGER_DEADBAND
+
+        if (pressed && !previousHoldInput) {
+            holdInputTimer.reset()
+        }
+
+        if (pressed) {
+            holdPower = getHoldPower(holdInputTimer.seconds())
+
+            motorAbove.power = holdPower
+            motorBelow.power = holdPower
+        }
+
+        previousHoldInput = pressed
+    }
+
 
     fun getMotorAbovePower(): Double = motorAbove.power
     fun getMotorBelowPower(): Double = motorBelow.power

@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01
+package FGC.Vietnam
 
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 

@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.Config
+package FGC.Vietnam.Config
 
 import com.acmerobotics.dashboard.config.Config
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit

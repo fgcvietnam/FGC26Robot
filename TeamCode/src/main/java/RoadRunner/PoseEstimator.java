@@ -6,7 +6,7 @@ import com.acmerobotics.roadrunner.Vector2d;
 
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 
-import fgc.vietnam.robot01.Config.VisionConfig;
+import FGC.Vietnam.Config.VisionConfig;
 
 public class PoseEstimator {
 

@@ -1,8 +1,12 @@
 package fgc.vietnam.robot01.Hardware
 
+import FGC.Vietnam.Config.DrivetrainConfig
+import FGC.Vietnam.Config.RobotConfig
+import FGC.Vietnam.Hardware.Vision
+import FGC.Vietnam.Utils.FeedForward
+import FGC.Vietnam.Utils.PIDFController
 import RoadRunner.Localizer
 import RoadRunner.PoseEstimator
-import TeamVietnam.control.PIDFController
 import com.acmerobotics.roadrunner.DualNum
 import com.acmerobotics.roadrunner.Pose2d
 import com.acmerobotics.roadrunner.PoseVelocity2d
@@ -18,9 +22,6 @@ import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.IMU
-import fgc.vietnam.robot01.Config.DrivetrainConfig
-import fgc.vietnam.robot01.Config.RobotConfig
-import fgc.vietnam.robot01.Utils.FeedForward
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 import kotlin.math.PI
@@ -190,26 +191,26 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
             mode = DcMotor.RunMode.RUN_WITHOUT_ENCODER
         }
 
-    private fun updateGlobalPose() {
-        localizer.update()
+    private fun updateGlobalPose(currentHeadingRad: Double) {
+        if (DrivetrainConfig.LOCALIZER_ENABLE) {
+            localizer.update()
 
 //         Use IMU heading for stability in the pose estimator
-        val robotAngles = imu.robotYawPitchRollAngles
-        val currentHeadingRad = robotAngles.getYaw(AngleUnit.RADIANS)
-        val imuHeading = Rotation2d.exp(currentHeadingRad)
+            val imuHeading = Rotation2d.exp(currentHeadingRad)
 
-        poseEstimator.updateOdometry(localizer.getPose(), imuHeading)
+            poseEstimator.updateOdometry(localizer.getPose(), imuHeading)
 
-        // Correct drift using vision if an AprilTag is detected
-        val detection = vision.getBestDetection()
-        if (detection != null) {
-            val visionPose = vision.getRobotPose(detection)
+            // Correct drift using vision if an AprilTag is detected
+            val detection = vision.getBestDetection()
+            if (detection != null) {
+                val visionPose = vision.getRobotPose(detection)
 
-            if (visionPose != null) {
-                poseEstimator.addVisionMeasurement(
-                    visionPose,
-                    detection
-                )
+                if (visionPose != null) {
+                    poseEstimator.addVisionMeasurement(
+                        visionPose,
+                        detection
+                    )
+                }
             }
         }
     }
@@ -236,7 +237,10 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
     }
 
     fun drive(forward: Double, turn: Double, precisionMode: Boolean = false, batteryVoltage: Double): DriveTelemetry? {
-        updateGlobalPose()
+        val robotAngles = imu.robotYawPitchRollAngles
+        val currentHeadingRad = robotAngles.getYaw(AngleUnit.RADIANS)
+
+        updateGlobalPose(currentHeadingRad)
         val currentPose = poseEstimator.pose
         val currentTime = System.currentTimeMillis() / 1000.0
 
@@ -263,8 +267,6 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         val userTurnInput = turnShaped * turnMultiplier
         var finalTurn = userTurnInput
 
-        val robotAngles = imu.robotYawPitchRollAngles
-        val currentHeadingRad = robotAngles.getYaw(AngleUnit.RADIANS)
         val robotTilting =
             abs(robotAngles.getPitch(AngleUnit.DEGREES)) >
                     DrivetrainConfig.MAX_TILT_FOR_HEADING_CORRECTION_DEG ||

@@ -27,21 +27,47 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package fgc.vietnam.robot01;
+package RoadRunner;
 
 
 
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.robotcore.external.stream.CameraStreamSource;
+import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
 import org.firstinspires.ftc.vision.VisionPortal;
+import org.firstinspires.ftc.vision.VisionProcessor;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.util.Size;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.firstinspires.ftc.robotcore.external.function.Consumer;
+import org.firstinspires.ftc.robotcore.external.function.Continuation;
+import org.firstinspires.ftc.robotcore.external.stream.CameraStreamSource;
+import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
+
+import org.firstinspires.ftc.vision.VisionProcessor;
+
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+
+
 import global.first.IgnitingInnovationGameDatabase;
 /**
  * This OpMode illustrates the basics of AprilTag recognition and pose estimation,
@@ -60,10 +86,16 @@ public class IgnitingInnovationAprilTagSample extends LinearOpMode {
      */
     private VisionPortal visionPortal;
 
+    private FtcDashboard ftcDashboard;
+
+    private TelemetryPacket packet;
+    private CameraStreamProcessor cameraStreamProcessor;
+
     @Override
     public void runOpMode() {
 
         initAprilTag();
+
 
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
@@ -73,7 +105,6 @@ public class IgnitingInnovationAprilTagSample extends LinearOpMode {
 
         if (opModeIsActive()) {
             while (opModeIsActive()) {
-
                 telemetryAprilTag();
 
                 // Push telemetry to the Driver Station.
@@ -105,10 +136,11 @@ public class IgnitingInnovationAprilTagSample extends LinearOpMode {
         aprilTag = new AprilTagProcessor.Builder()
             .setTagLibrary(IgnitingInnovationGameDatabase.getIgnitingInnovationTagLibrary())
             .setOutputUnits(DistanceUnit.CM, AngleUnit.DEGREES)
-            //.setDrawAxes(false)
-            //.setDrawCubeProjection(false)
-            //.setDrawTagOutline(true)
-            //.setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
+            .setDrawAxes(true)
+            .setDrawCubeProjection(true)
+            .setDrawTagOutline(true)
+            .setDrawTagID(true)
+            .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
 
             // == CAMERA CALIBRATION ==
             // If you do not manually specify calibration parameters, the SDK will attempt
@@ -120,13 +152,21 @@ public class IgnitingInnovationAprilTagSample extends LinearOpMode {
             .build();
 
         // Create the vision portal by using a builder.
+
         VisionPortal.Builder builder = new VisionPortal.Builder();
 
+        builder.setCamera(
+                hardwareMap.get(WebcamName.class, "Webcam")
+        );
+
+        builder.addProcessor(aprilTag);
+
+        builder.setCameraResolution(new Size(1280, 720));
+
+        visionPortal = builder.build();
         // Set the webcam (name is assumed to be "Webcam 1")
-        builder.setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"));
 
         // Choose a camera resolution. Not all cameras support all resolutions.
-        //builder.setCameraResolution(new Size(640, 480));
 
         // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
         //builder.enableCameraMonitoring(true);
@@ -140,10 +180,8 @@ public class IgnitingInnovationAprilTagSample extends LinearOpMode {
         //builder.setAutoStopLiveView(false);
 
         // Set and enable the processor.
-        builder.addProcessor(aprilTag);
 
         // Build the Vision Portal, using the above settings.
-        visionPortal = builder.build();
 
         // Disable or re-enable the aprilTag processor at any time.
         //visionPortal.setProcessorEnabled(aprilTag, true);
@@ -180,4 +218,54 @@ public class IgnitingInnovationAprilTagSample extends LinearOpMode {
 
     }   // end method telemetryAprilTag()
 
+    public static class CameraStreamProcessor implements VisionProcessor, CameraStreamSource {
+
+        private final AtomicReference<Bitmap> lastFrame =
+                new AtomicReference<>(
+                        Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565)
+                );
+
+        @Override
+        public void init(int width, int height, CameraCalibration calibration) {
+            lastFrame.set(
+                    Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+            );
+        }
+
+        @Override
+        public Object processFrame(Mat frame, long captureTimeNanos) {
+
+            Bitmap bitmap = Bitmap.createBitmap(
+                    frame.width(),
+                    frame.height(),
+                    Bitmap.Config.RGB_565
+            );
+
+            Utils.matToBitmap(frame, bitmap);
+            lastFrame.set(bitmap);
+
+            return null;
+        }
+
+        @Override
+        public void onDrawFrame(
+                Canvas canvas,
+                int onscreenWidth,
+                int onscreenHeight,
+                float scaleBmpPxToCanvasPx,
+                float scaleCanvasDensity,
+                Object userContext
+        ) {
+            // Nothing needed here.
+        }
+
+        @Override
+        public void getFrameBitmap(
+                Continuation<? extends Consumer<Bitmap>> continuation
+        ) {
+            continuation.dispatch(
+                    bitmapConsumer -> bitmapConsumer.accept(lastFrame.get())
+            );
+        }
+    }
 }   // end class

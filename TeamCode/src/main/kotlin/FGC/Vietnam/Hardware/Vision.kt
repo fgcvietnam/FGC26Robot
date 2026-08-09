@@ -1,8 +1,9 @@
-package fgc.vietnam.robot01.Hardware
+package FGC.Vietnam.Hardware
+import android.util.Size
 import com.acmerobotics.roadrunner.Pose2d
 import com.acmerobotics.roadrunner.Rotation2d
 import com.qualcomm.robotcore.hardware.HardwareMap
-import fgc.vietnam.robot01.Config.VisionConfig
+import FGC.Vietnam.Config.VisionConfig
 import global.first.IgnitingInnovationGameDatabase
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit
@@ -17,12 +18,18 @@ internal class Vision(hardwareMap: HardwareMap) {
         .setTagLibrary(IgnitingInnovationGameDatabase.getIgnitingInnovationTagLibrary())
         .setOutputUnits(DistanceUnit.MM, AngleUnit.DEGREES)
         .setCameraPose(VisionConfig.CAMERA_POSITION, VisionConfig.CAMERA_ORIENTATION)
+        .setDrawAxes(true)
+        .setDrawCubeProjection(true)
+        .setDrawTagOutline(true)
+        .setDrawTagID(true)
+        .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
         .build()
 
 
     private val portal: VisionPortal? = VisionPortal.Builder()
         .setCamera(hardwareMap.get<WebcamName>(WebcamName::class.java, "Webcam"))
         .addProcessor(aprilTag)
+        .setCameraResolution(Size(1280, 720))
         .build()
 
     fun getBestDetection(): AprilTagDetection? {

@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.Config
+package FGC.Vietnam.Config
 
 import com.acmerobotics.dashboard.config.Config
 
@@ -15,4 +15,5 @@ object IntakeConfig {
     @JvmField var MAGNETIC_SWITCH_CONFIRM_DELAY_MS = 200
     @JvmField var INTAKE_JAM_DETECTION_DELAY_MS = 400
     @JvmField var INTAKE_UNJAM_DELAY_MS = 100
+    @JvmField var INTAKE_DEBUG = false
 }

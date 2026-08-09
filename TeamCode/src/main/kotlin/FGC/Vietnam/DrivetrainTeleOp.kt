@@ -1,6 +1,6 @@
-package fgc.vietnam.robot01
+package FGC.Vietnam
 
-import MotorTester
+import Climb
 import RoadRunner.Drawing.drawRobot
 import android.graphics.Color
 import com.acmerobotics.dashboard.FtcDashboard
@@ -13,13 +13,13 @@ import com.qualcomm.robotcore.hardware.Blinker
 import com.qualcomm.robotcore.hardware.Gamepad
 import com.qualcomm.robotcore.hardware.VoltageSensor
 import com.qualcomm.robotcore.util.ElapsedTime
-import fgc.vietnam.robot01.Config.ClimbConfig
-import fgc.vietnam.robot01.Config.DrivetrainConfig
-import fgc.vietnam.robot01.Config.FlywheelConfig
-import fgc.vietnam.robot01.Config.IntakeConfig
-import fgc.vietnam.robot01.Config.RoadRunnerConfig
-import fgc.vietnam.robot01.DataLogger.TeleOpDatalogger
-import fgc.vietnam.robot01.Hardware.Climb
+import FGC.Vietnam.Config.ClimbConfig
+import FGC.Vietnam.Config.DrivetrainConfig
+import FGC.Vietnam.Config.FlywheelConfig
+import FGC.Vietnam.Config.IntakeConfig
+import FGC.Vietnam.Config.RoadRunnerConfig
+import FGC.Vietnam.DataLogger.TeleOpDatalogger
+import FGC.Vietnam.Utils.MotorTester
 import fgc.vietnam.robot01.Hardware.Drivetrain
 import fgc.vietnam.robot01.Hardware.Flywheel
 import fgc.vietnam.robot01.Hardware.Intake
@@ -180,7 +180,7 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         packet = TelemetryPacket(false)
 
 
-        val headingToggle = gamepad1.a || gamepad2.a
+        val headingToggle = gamepad1.shareWasPressed() || gamepad2.shareWasPressed()
         if (headingToggle && !previousHeadingToggle) {
             drivetrain.toggleHeadingHold()
         }
@@ -291,12 +291,15 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
 
         val climbInput = gamepad1.right_trigger
 
-        val power = abs(climbInput / ClimbConfig.CUT_OFF_INPUT).coerceAtMost(1.0)
+        val climbForwardInput = gamepad1.right_trigger
+        val climbHoldInput = gamepad1.left_trigger
 
-        if (climbInput > ClimbConfig.TRIGGER_DEADBAND) {
-            climb.climbForward(abs(power))
-        } else if (climbInput > ClimbConfig.TRIGGER_DEADBAND || gamepad1.touchpad) {
-            climb.climbBackward(abs(power))
+        if (climbForwardInput > ClimbConfig.TRIGGER_DEADBAND) {
+            climb.climbForward(abs(climbForwardInput))
+        } else if (climbHoldInput > ClimbConfig.TRIGGER_DEADBAND) {
+            climb.updateHoldPower(abs(climbHoldInput))
+        } else if (gamepad1.touchpad) {
+            climb.climbBackward(1.0)
         } else {
             climb.stop()
         }
@@ -343,8 +346,6 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         drawRobot(packet.fieldOverlay(), poseInches)
 
         // Get heading correction data for dashboard
-        val headingData: Drivetrain.HeadingCorrectionData = drivetrain.getHeadingCorrectionData()
-
 
         if (ClimbConfig.CLIMB_DEBUG){
             packet.put("Distance (mm): ", climb.getDistance())
@@ -354,7 +355,8 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
             packet.put("Servo power: ", climb.getServoPower())
         }
 
-        if  (headingData != null && DrivetrainConfig.ENABLE_ACTIVE_HEADING_TUNING) {
+        if  (DrivetrainConfig.ENABLE_ACTIVE_HEADING_TUNING) {
+            val headingData: Drivetrain.HeadingCorrectionData = drivetrain.getHeadingCorrectionData()
             packet.put("Heading Target (deg)", headingData.targetHeadingDeg);
             packet.put("Heading Actual (deg)", headingData.currentHeadingDeg);
             packet.put("Heading Error (deg)", headingData.headingErrorDeg);
@@ -380,6 +382,10 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         if (IntakeConfig.ENABLE_LIMIT_SWITCH_AND_MAGNETIC_TESTING){
             packet.put("Right Limit Switch is Pressed", intake.rightLimitSwitchIsPressed())
             packet.put("Left Limit Switch is Pressed", intake.leftLimitSwitchIsPressed())
+            packet.put("Right Magnetic Switch is Confirmed", intake.leftMagnetConfirmed())
+            packet.put("Left Magnetic Switch is Confirmed", intake.rightMagnetConfirmed())
+            packet.put("Right Magnetic Switch is Pressed", intake.rightMagnetRegistered())
+            packet.put("Left Magnetic Switch is Pressed", intake.leftMagnetRegistered())
             packet.put("Right Intake Slide State ", intake.getRightIntakeSlidePosition().name)
             packet.put("Left Intake Slide State ", intake.getLeftIntakeSlidePosition().name)
             packet.put("Servo Right Below Power", intake.servoRightBelowPower)

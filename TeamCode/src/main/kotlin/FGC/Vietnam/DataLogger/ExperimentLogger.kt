@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.DataLogger
+package FGC.Vietnam.DataLogger
 
 internal data class ExperimentRunContext(
     val scenarioId: String,
