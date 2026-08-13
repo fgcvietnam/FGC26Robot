@@ -1,0 +1,55 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<Robot type="FirstInspires-FTC">
+    <Webcam name="Webcam" serialNumber="VendorProduct:vendor=0x046d|product=0x0825|connection=" />
+    <LynxUsbDevice name="Control Hub Portal" serialNumber="(embedded)" parentModuleAddress="173">
+        <LynxModule name="Control Hub" port="173">
+            <REV_VL53L0X_RANGE_SENSOR name="climbDistanceSensor" port="0" bus="1" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="climbAbove" port="0" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="driveRight" port="1" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="leftShooterMotor" port="2" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="climbBelow" port="3" />
+
+
+
+            <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
+
+            <ContinuousRotationServo name="leftBelowIntakeServo" port="0"/>
+            <ContinuousRotationServo name="leftAboveIntakeServo" port="2"/>
+            <ContinuousRotationServo name="climbServo" port="4"/>
+
+
+            <RevTouchSensor name="leftLimitSwitchExtension" port="1" />
+
+            <RevTouchSensor name="leftMagneticSwitchExtension" port="5"/>
+            <RevTouchSensor name="rightMagneticSwitchExtension" port="7"/>
+
+
+
+
+
+
+            <!--            <RevColorSensorV3 name="intakeColorSensor" port="0" bus="1"/>-->
+
+
+        </LynxModule>
+        <LynxModule name="Expansion Hub 2" port="2">
+
+            <RevRoboticsUltraplanetaryHDHexMotor name="intake" port="0" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="transfer" port="1" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="rightShooterMotor" port="2" />
+            <RevRoboticsUltraplanetaryHDHexMotor name="driveLeft" port="3" />
+
+            <ContinuousRotationServo name="rightBelowIntakeServo" port="0"/>
+            <ContinuousRotationServo name="rightAboveIntakeServo" port="2"/>
+
+            <RevTouchSensor name="rightLimitSwitchExtension" port="1" />
+
+
+
+
+
+
+
+        </LynxModule>
+    </LynxUsbDevice>
+</Robot>
