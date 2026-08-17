@@ -315,7 +315,6 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 finalTurn = lastCorrectionPower
             } else {
                 lastCorrectionPower = 0.0
-                headingController.reset()
             }
         } else {
             lastCorrectionPower = 0.0
@@ -426,7 +425,6 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 finalTurn += correction
             } else {
                 lastCorrectionPower = 0.0
-                headingController.reset()
             }
         } else {
             lastCorrectionPower = 0.0

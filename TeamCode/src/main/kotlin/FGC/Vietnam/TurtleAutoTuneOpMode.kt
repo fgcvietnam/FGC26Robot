@@ -1,7 +1,4 @@
 /*
- * Temporarily disabled: TurtleTuner integration.
- * Remove this outer block comment to restore the OpMode.
- *
 package FGC.Vietnam
 
 import com.qualcomm.hardware.lynx.LynxModule
@@ -18,9 +15,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * TurtleTuner Self-Contained Bounded SysId & Drivetrain Tuner OpMode.
- * Single-file footprint: To remove TurtleTuner completely, simply delete this one file.
  */
 @TeleOp(name = "🐢 TurtleTuner Bounded SysId", group = "Tuning")
 class TurtleAutoTuneOpMode : OpMode() {

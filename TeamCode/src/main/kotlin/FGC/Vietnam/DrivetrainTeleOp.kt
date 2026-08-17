@@ -232,7 +232,13 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
                     2000
                 )
             }
-
+        } else if (intake.getIntakeState() == IntakeState.OFF) {
+            if (!gamepad1.isRumbling) {
+                gamepad1.runRumbleEffect(rumblePattern)
+            }
+            if (!gamepad2.isRumbling) {
+                gamepad2.runRumbleEffect(rumblePattern)
+            }
         } else {
             if (gamepad1.isRumbling) {
                 gamepad1.stopRumble()
