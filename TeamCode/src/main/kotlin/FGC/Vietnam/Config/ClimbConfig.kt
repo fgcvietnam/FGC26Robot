@@ -5,6 +5,7 @@ import com.acmerobotics.dashboard.config.Config
 
 @Config
 object ClimbConfig {
+    @JvmField var DATALOG_ENABLED = false
     @JvmField var CUT_OFF_INPUT = 0.7
 
     @JvmField var TRIGGER_DEADBAND = 0.05;

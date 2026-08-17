@@ -45,6 +45,8 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
 
     private var previousHeadingToggle = false
     private var previousDatalogToggle = false
+    private var lastTempQueryTimeMs = 0L
+    private var cachedHubTemps: List<Double> = emptyList()
 
 
     private lateinit var dashboard: FtcDashboard
@@ -231,14 +233,6 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
                 )
             }
 
-        } else if (intake.getIntakeState() == IntakeState.OFF) {
-            if (!gamepad1.isRumbling) {
-                gamepad1.runRumbleEffect(rumblePattern)
-            }
-            if (!gamepad2.isRumbling) {
-                gamepad2.runRumbleEffect(rumblePattern)
-            }
-
         } else {
             if (gamepad1.isRumbling) {
                 gamepad1.stopRumble()
@@ -382,16 +376,36 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         if (IntakeConfig.ENABLE_LIMIT_SWITCH_AND_MAGNETIC_TESTING){
             packet.put("Right Limit Switch is Pressed", intake.rightLimitSwitchIsPressed())
             packet.put("Left Limit Switch is Pressed", intake.leftLimitSwitchIsPressed())
-            packet.put("Right Magnetic Switch is Confirmed", intake.leftMagnetConfirmed())
-            packet.put("Left Magnetic Switch is Confirmed", intake.rightMagnetConfirmed())
+            packet.put("Both Limits Pressed (Home)", intake.bothLimitsPressed())
+            packet.put("Limit Sync State", intake.getLimitSyncState())
             packet.put("Right Magnetic Switch is Pressed", intake.rightMagnetRegistered())
             packet.put("Left Magnetic Switch is Pressed", intake.leftMagnetRegistered())
-            packet.put("Right Intake Slide State ", intake.getRightIntakeSlidePosition().name)
-            packet.put("Left Intake Slide State ", intake.getLeftIntakeSlidePosition().name)
+            packet.put("Both Magnets Detected (Extended)", intake.bothMagnetsRegistered())
+            packet.put("Magnet Sync State", intake.getMagnetSyncState())
+            packet.put("Right Magnetic Switch is Confirmed", intake.rightMagnetConfirmed())
+            packet.put("Left Magnetic Switch is Confirmed", intake.leftMagnetConfirmed())
+            packet.put("Both Magnets Confirmed", intake.bothMagnetsConfirmed())
+            packet.put("Right Intake Slide State", intake.getRightIntakeSlidePosition().name)
+            packet.put("Left Intake Slide State", intake.getLeftIntakeSlidePosition().name)
+            packet.put("Slides Synchronized", intake.areSlidesSynchronized())
+            packet.put("Slide Skew State", intake.getSlideSkewState())
             packet.put("Servo Right Below Power", intake.servoRightBelowPower)
             packet.put("Servo Right Above Power", intake.servoRightAbovePower)
             packet.put("Servo Left Below Power", intake.servoLeftBelowPower)
             packet.put("Servo Left Above Power", intake.servoLeftAbovePower)
+        }
+
+        if (drive != null) {
+            packet.put("Heading Deg", drive.heading)
+            packet.put("Target Heading Deg", drive.targetHeading)
+            packet.put("Heading Error Deg", drive.headingError)
+            packet.put("Left Ticks", drive.leftEncoderPosition)
+            packet.put("Right Ticks", drive.rightEncoderPosition)
+            packet.put("Left Vel (ticks/s)", drive.leftActualVelocity)
+            packet.put("Right Vel (ticks/s)", drive.rightActualVelocity)
+            packet.put("Left Motor Power", drive.leftMotorPower)
+            packet.put("Right Motor Power", drive.rightMotorPower)
+            packet.put("Battery (V)", voltageSensor.voltage)
         }
 
         dashboard.sendTelemetryPacket(packet)
@@ -404,11 +418,15 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
             previousDatalogToggle = datalogToggle
 
             if (datalogger.isLogging) {
-                val hubTemps = lynxModules.map { hub ->
-                    try {
-                        hub.getTemperature(TempUnit.CELSIUS)
-                    } catch (e: Exception) {
-                        Double.NaN
+                val nowMs = System.currentTimeMillis()
+                if (nowMs - lastTempQueryTimeMs >= 2000L || cachedHubTemps.isEmpty()) {
+                    lastTempQueryTimeMs = nowMs
+                    cachedHubTemps = lynxModules.map { hub ->
+                        try {
+                            hub.getTemperature(TempUnit.CELSIUS)
+                        } catch (e: Exception) {
+                            Double.NaN
+                        }
                     }
                 }
                 datalogger.writeRow(
@@ -417,12 +435,12 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
                     drive = drive,
                     flywheel = flywheelState,
                     intake = intake,
-                    hubTemperaturesCelsius = hubTemps,
+                    hubTemperaturesCelsius = cachedHubTemps,
                 )
             }
         }
 
-        if (flywheelState == null || drive == null || intake == null) return
+        if (drive == null || intake == null) return
 
         telemetry.addData(
             "Input",
@@ -471,49 +489,76 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
             drive.batteryVoltage,
             DrivetrainConfig.GEAR_REDUCTION,
         )
-        telemetry.addData(
-            "Flywheel",
-            "%s %s shaft=%.0f/%.0f rpm difference=%.0f",
-            if (flywheelState.enabled) "ON" else "OFF",
-            if (flywheelState.atSpeed) "READY" else "—",
-            flywheelState.shaftRpm,
-            flywheelState.targetRpm,
-            flywheelState.rpmDifference,
-        )
-        telemetry.addData(
-            "Flywheel M2",
-            "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
-            flywheelState.leftShooterMotor.rpm,
-            flywheelState.leftShooterMotor.velocity,
-            flywheelState.targetVelocity,
-            flywheelState.leftShooterMotor.currentAmps,
-        )
-        telemetry.addData(
-            "Flywheel M3",
-            "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
-            flywheelState.rightShooterMotor.rpm,
-            flywheelState.rightShooterMotor.velocity,
-            flywheelState.targetVelocity,
-            flywheelState.rightShooterMotor.currentAmps,
-        )
+
+        if (flywheelState != null && flywheelState.enabled) {
+            telemetry.addData(
+                "Flywheel",
+                "%s %s shaft=%.0f/%.0f rpm difference=%.0f",
+                if (flywheelState.enabled) "ON" else "OFF",
+                if (flywheelState.atSpeed) "READY" else "—",
+                flywheelState.shaftRpm,
+                flywheelState.targetRpm,
+                flywheelState.rpmDifference,
+            )
+            telemetry.addData(
+                "Flywheel M2",
+                "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
+                flywheelState.leftShooterMotor.rpm,
+                flywheelState.leftShooterMotor.velocity,
+                flywheelState.targetVelocity,
+                flywheelState.leftShooterMotor.currentAmps,
+            )
+            telemetry.addData(
+                "Flywheel M3",
+                "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
+                flywheelState.rightShooterMotor.rpm,
+                flywheelState.rightShooterMotor.velocity,
+                flywheelState.targetVelocity,
+                flywheelState.rightShooterMotor.currentAmps,
+            )
+            telemetry.addData(
+                "Flywheel wheel",
+                "rim=%.1f m/s",
+                flywheelState.surfaceSpeedMetersPerSecond,
+            )
+        } else {
+            telemetry.addData("Flywheel", "OFF")
+        }
 
         telemetry.addData(
             "Intake",
-            "state=%s hex=%s",
-            intake.getIntakeState(),
+            "state=%s hex=%.2f pwr=%.2f",
+            intake.getIntakeState().name,
+            intake.hexMotorPower,
+            intake.motorPower,
         )
+
+        telemetry.addData(
+            "Linear Slide Sync",
+            "Pos: %s | Mag: %s | Home: %s",
+            intake.getSlideSkewState(),
+            intake.getMagnetSyncState(),
+            intake.getLimitSyncState(),
+        )
+
+        if (IntakeConfig.INTAKE_DEBUG) {
+            telemetry.addData(
+                "Slide Sensors",
+                "Mag [L:%s R:%s Both:%s] | Lim [L:%s R:%s Both:%s]",
+                if (intake.leftMagnetRegistered()) "HIT" else "—",
+                if (intake.rightMagnetRegistered()) "HIT" else "—",
+                if (intake.bothMagnetsRegistered()) "YES" else "NO",
+                if (intake.leftLimitSwitchIsPressed()) "HIT" else "—",
+                if (intake.rightLimitSwitchIsPressed()) "HIT" else "—",
+                if (intake.bothLimitsPressed()) "YES" else "NO",
+            )
+        }
 
         telemetry.addData(
             "Datalog",
             "%s rows=%d",
             if (datalogger.isLogging) "● REC" else "○ off",
             datalogger.rowCount,
-        )
-
-        telemetry.addData(
-            "Flywheel wheel",
-            "rim=%.1f m/s",
-            flywheelState.surfaceSpeedMetersPerSecond,
         )
     }
 

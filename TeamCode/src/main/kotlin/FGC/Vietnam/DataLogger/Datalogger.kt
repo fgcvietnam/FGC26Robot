@@ -10,37 +10,70 @@ import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 internal class Datalogger private constructor(
     val file: File,
     private val writer: BufferedWriter,
 ) : Closeable {
-    var rowCount = 0
-        private set
+    private val queue = ArrayBlockingQueue<String>(QUEUE_CAPACITY)
+    private val isRunning = AtomicBoolean(true)
+    private val rowCounter = AtomicInteger(0)
 
+    val rowCount: Int get() = rowCounter.get()
+
+    @Volatile
     var errorMessage: String? = null
         private set
 
-    fun writeRow(values: List<Any?>): Boolean {
-        if (errorMessage != null) return false
-        return try {
-            writer.appendLine(values.joinToString(separator = ",", transform = ::escape))
-            rowCount += 1
-            if (rowCount % FLUSH_INTERVAL_ROWS == 0) writer.flush()
-            true
-        } catch (exception: IOException) {
-            errorMessage = exception.message ?: exception.javaClass.simpleName
-            false
+    private val writerThread = Thread({
+        var unwrittenCount = 0
+        while (isRunning.get() || !queue.isEmpty()) {
+            try {
+                val line = queue.poll(100, TimeUnit.MILLISECONDS) ?: continue
+                writer.write(line)
+                writer.newLine()
+                unwrittenCount++
+
+                if (unwrittenCount >= FLUSH_INTERVAL_ROWS || queue.isEmpty()) {
+                    writer.flush()
+                    unwrittenCount = 0
+                }
+            } catch (exception: Exception) {
+                if (errorMessage == null) {
+                    errorMessage = exception.message ?: exception.javaClass.simpleName
+                }
+            }
         }
+        try {
+            writer.flush()
+        } catch (_: Exception) {}
+    }, "Datalogger-Async-Writer").apply {
+        isDaemon = true
+        priority = Thread.MIN_PRIORITY
+        start()
+    }
+
+    fun writeRow(values: List<Any?>): Boolean {
+        if (errorMessage != null || !isRunning.get()) return false
+        val line = values.joinToString(separator = ",", transform = ::escape)
+        val offered = queue.offer(line)
+        if (offered) {
+            rowCounter.incrementAndGet()
+            return true
+        }
+        return false
     }
 
     override fun close() {
+        if (!isRunning.compareAndSet(true, false)) return
         try {
-            writer.flush()
-        } catch (exception: IOException) {
-            if (errorMessage == null) {
-                errorMessage = exception.message ?: exception.javaClass.simpleName
-            }
+            writerThread.join(1000)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
         }
 
         try {
@@ -61,7 +94,8 @@ internal class Datalogger private constructor(
     }
 
     internal companion object {
-        private const val FLUSH_INTERVAL_ROWS = 25
+        private const val QUEUE_CAPACITY = 4096
+        private const val FLUSH_INTERVAL_ROWS = 50
 
         fun create(prefix: String, header: List<String>): Datalogger {
             val directory = File(AppUtil.FIRST_FOLDER, "Datalogs")
@@ -72,7 +106,8 @@ internal class Datalogger private constructor(
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
             val file = File(directory, "${prefix}_$timestamp.csv")
             val writer = BufferedWriter(
-                OutputStreamWriter(FileOutputStream(file, false), Charsets.UTF_8)
+                OutputStreamWriter(FileOutputStream(file, false), Charsets.UTF_8),
+                32768
             )
             val logger = Datalogger(file = file, writer = writer)
             if (!logger.writeRow(header)) {

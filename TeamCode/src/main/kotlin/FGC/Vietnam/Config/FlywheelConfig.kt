@@ -11,6 +11,7 @@ internal object FlywheelConfig {
     const val MOTOR_ENCODER_TICKS_PER_REVOLUTION = 28.0
     const val WHEEL_DIAMETER_MM = 90.0
     @JvmField var DEFAULT_RPM = 1_800.0
+    @JvmField var DATALOG_ENABLED = false
 
     @JvmField var PIDF_P = 0.001
     @JvmField var PIDF_I = 0.0

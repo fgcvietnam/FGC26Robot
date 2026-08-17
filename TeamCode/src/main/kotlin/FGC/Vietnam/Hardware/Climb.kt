@@ -20,7 +20,7 @@ internal class Climb(hardwareMap: HardwareMap) {
     private var previousHoldInput = false
 
     private val motorAbove = hardwareMap.get(DcMotorEx::class.java, "climbAbove").apply {
-        direction = DcMotorSimple.Direction.FORWARD
+        direction = DcMotorSimple.Direction.REVERSE
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         mode = DcMotor.RunMode.RUN_USING_ENCODER
         power = 0.0

@@ -302,7 +302,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         }
         wasUserTurning = userTurning
 
-        if (activeHeadingHoldEnabled && !robotTilting && !isHeadingCorrectionTimedOut(currentTime)) {
+        val isTranslating = abs(driveForward) > DrivetrainConfig.FORWARD_DEADBAND
+        if (activeHeadingHoldEnabled && isTranslating && !robotTilting && !isHeadingCorrectionTimedOut(currentTime)) {
             val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
 
             lastHeadingErrorDeg = Math.toDegrees(error)
@@ -340,7 +341,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
             )
         }
 
-        if (RobotConfig.DATALOG_ENABLED) {
+        if (RobotConfig.DATALOG_ENABLED || DrivetrainConfig.DATALOG_ENABLED) {
             val angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES)
             val bestDetection = vision.getBestDetection()
             return DriveTelemetry(
@@ -388,9 +389,122 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         return null
     }
 
+    /**
+     * Direct drive method for autonomous / automated test routines.
+     * Bypasses joystick deadband and expo shaping, with capped heading correction.
+     */
+    fun driveDirect(
+        forward: Double,
+        turn: Double = 0.0,
+        batteryVoltage: Double,
+        holdHeading: Boolean = true
+    ): DriveTelemetry? {
+        val robotAngles = imu.robotYawPitchRollAngles
+        val currentHeadingRad = robotAngles.getYaw(AngleUnit.RADIANS)
+
+        updateGlobalPose(currentHeadingRad)
+        val currentPose = poseEstimator.pose
+
+        val driveForward = forward.coerceIn(-1.0, 1.0)
+        var finalTurn = turn.coerceIn(-1.0, 1.0)
+
+        val robotTilting =
+            abs(robotAngles.getPitch(AngleUnit.DEGREES)) > DrivetrainConfig.MAX_TILT_FOR_HEADING_CORRECTION_DEG ||
+            abs(robotAngles.getRoll(AngleUnit.DEGREES)) > DrivetrainConfig.MAX_TILT_FOR_HEADING_CORRECTION_DEG
+
+        lastCurrentHeadingDeg = Math.toDegrees(currentHeadingRad)
+        lastTargetHeadingDeg = Math.toDegrees(customHeadingRad)
+        lastTiltingSafety = robotTilting
+
+        if (holdHeading && DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION && !robotTilting && abs(driveForward) > 0.01) {
+            val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
+            lastHeadingErrorDeg = Math.toDegrees(error)
+
+            if (abs(Math.toDegrees(error)) > DrivetrainConfig.ACTIVE_HEADING_HOLD_DEADBAND_DEG) {
+                val correction = headingController.calculate(error, 0.0).coerceIn(-0.35, 0.35)
+                lastCorrectionPower = correction
+                finalTurn += correction
+            } else {
+                lastCorrectionPower = 0.0
+                headingController.reset()
+            }
+        } else {
+            lastCorrectionPower = 0.0
+            headingController.reset()
+        }
+
+        var left = driveForward - finalTurn
+        var right = driveForward + finalTurn
+        val maxPower = max(1.0, max(abs(left), abs(right)))
+        left /= maxPower
+        right /= maxPower
+
+        setMotorPowersSmart(left, right, batteryVoltage)
+
+        if (DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION) {
+            headingController.setPIDF(
+                kP = DrivetrainConfig.ACTIVE_HEADING_KP,
+                kI = DrivetrainConfig.ACTIVE_HEADING_KI,
+                kD = DrivetrainConfig.ACTIVE_HEADING_KD,
+                FeedForward(
+                    kS = DrivetrainConfig.ACTIVE_HEADING_KS
+                )
+            )
+        }
+
+        if (RobotConfig.DATALOG_ENABLED || DrivetrainConfig.DATALOG_ENABLED) {
+            val angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES)
+            val bestDetection = vision.getBestDetection()
+            return DriveTelemetry(
+                requestedForward = forward,
+                limitedForward = driveForward,
+                requestedTurn = turn,
+                heading = Math.toDegrees(currentHeadingRad),
+                targetHeading = Math.toDegrees(customHeadingRad),
+                headingError = Math.toDegrees(
+                    minimalAngleDifference(customHeadingRad, currentHeadingRad)
+                ),
+                headingCorrection = lastCorrectionPower,
+                proportionalCorrection = headingController.lastProportional,
+                integralCorrection = headingController.lastIntegral,
+                derivativeCorrection = headingController.lastDerivative,
+                yawRate = angularVelocity.zRotationRate.toDouble(),
+                leftTargetVelocity = left * leftMotor.motorType.achieveableMaxTicksPerSecond,
+                leftActualVelocity = leftMotor.velocity,
+                rightTargetVelocity = right * rightMotor.motorType.achieveableMaxTicksPerSecond,
+                rightActualVelocity = rightMotor.velocity,
+                leftCurrentAmps = leftMotor.getCurrent(CurrentUnit.AMPS),
+                rightCurrentAmps = rightMotor.getCurrent(CurrentUnit.AMPS),
+                linearSpeedMmPerSecond = (leftMotor.velocity + rightMotor.velocity) / 2.0 * DrivetrainConfig.millimetersPerEncoderTick,
+                batteryVoltage = batteryVoltage,
+                headingHoldEnabled = activeHeadingHoldEnabled,
+                leftEncoderPosition = leftMotor.currentPosition,
+                rightEncoderPosition = rightMotor.currentPosition,
+                leftMotorPower = left,
+                rightMotorPower = right,
+                pitchDegrees = robotAngles.getPitch(AngleUnit.DEGREES),
+                rollDegrees = robotAngles.getRoll(AngleUnit.DEGREES),
+                pitchRate = angularVelocity.xRotationRate.toDouble(),
+                rollRate = angularVelocity.yRotationRate.toDouble(),
+                leftWheelSpeedMmPerSecond = leftMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
+                rightWheelSpeedMmPerSecond = rightMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
+                tiltingSafety = robotTilting,
+                highSpeedTurnBoostActive = false,
+                poseX = currentPose.position.x,
+                poseY = currentPose.position.y,
+                poseHeading = Math.toDegrees(currentPose.heading.toDouble()),
+                visionActive = bestDetection != null,
+                bestDetectionId = bestDetection?.id ?: -1
+            )
+        }
+        return null
+    }
+
     private fun setMotorPowersSmart(left: Double, right: Double, batteryVoltage: Double) {
-        val voltageNorm = (batteryVoltage / RobotConfig.NOMINAL_BATTERY_VOLTAGE)
-            .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
+        val voltageNorm = if (batteryVoltage > 0.0) {
+            (RobotConfig.NOMINAL_BATTERY_VOLTAGE / batteryVoltage)
+                .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
+        } else 1.0
         
         val lp = (left * voltageNorm).coerceIn(-1.0, 1.0)
         val rp = (right * voltageNorm).coerceIn(-1.0, 1.0)
@@ -431,6 +545,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         activeHeadingHoldEnabled = false
         pendingHeadingLock = false
         headingController.reset()
+        vision.stop()
     }
 
     private fun minimalAngleDifference(target: Double, current: Double): Double {
@@ -457,6 +572,22 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
     }
 
     fun getCustomHeadingRad(): Double = customHeadingRad
+
+    fun getLeftEncoderPosition(): Int = leftMotor.currentPosition
+    fun getRightEncoderPosition(): Int = rightMotor.currentPosition
+
+    fun setCustomHeadingDeg(headingDeg: Double) {
+        customHeadingRad = Math.toRadians(headingDeg)
+        activeHeadingHoldEnabled = true
+        headingController.reset()
+    }
+
+    fun resetHeading(targetHeadingDeg: Double = 0.0) {
+        imu.resetYaw()
+        customHeadingRad = Math.toRadians(targetHeadingDeg)
+        activeHeadingHoldEnabled = true
+        headingController.reset()
+    }
 
 
     /**

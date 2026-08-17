@@ -16,6 +16,8 @@ android {
 
 dependencies {
     implementation project(':FtcRobotController')
+    // Temporarily disabled: TurtleTuner
+    // implementation project(':TurtleTuner')
     implementation files('lib/IgnitingInnovationAprilTagLibrary-1.0.jar')
 }
 

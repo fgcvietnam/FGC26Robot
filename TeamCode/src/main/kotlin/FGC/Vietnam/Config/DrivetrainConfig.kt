@@ -15,6 +15,7 @@ internal object DrivetrainConfig {
     val encoderTicksPerWheelRevolution = MOTOR_ENCODER_TICKS_PER_REVOLUTION * GEAR_REDUCTION
     val millimetersPerEncoderTick = PI * WHEEL_DIAMETER_MM / encoderTicksPerWheelRevolution
     // Drive shaping and limits
+    @JvmField var DATALOG_ENABLED = false
     @JvmField var FORWARD_DEADBAND = 0.05
     @JvmField var FORWARD_EXPO = 0.25
     @JvmField var TURN_DEADBAND = 0.05
@@ -44,9 +45,9 @@ internal object DrivetrainConfig {
     @JvmField var ACTIVE_HEADING_KI = 2.0
     @JvmField var ACTIVE_HEADING_KD = 0.4
     @JvmField var ACTIVE_HEADING_KS = 0.1
-    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 1
+    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 1.0
     @JvmField var ACTIVE_HEADING_TURN_DEADBAND = 0.05
-    @JvmField var ACTIVE_HEADING_SETTLE_TIME_SECONDS = 0.3
+    @JvmField var ACTIVE_HEADING_SETTLE_TIME_SECONDS = 0.25
     @JvmField var MAX_TILT_FOR_HEADING_CORRECTION_DEG = 15.0
     @JvmField var DPAD_ORIENTATION_TIMEOUT_SECONDS = -1.0 // Disabled
 

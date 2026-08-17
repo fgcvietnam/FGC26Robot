@@ -42,7 +42,7 @@ internal class TeleOpDatalogger {
         intake: Intake,
         hubTemperaturesCelsius: List<Double>,
     ) {
-        if (flywheel == null || drive == null || intake == null) return
+        if (drive == null || intake == null) return
 
         val log = logger ?: return
 
@@ -61,9 +61,14 @@ internal class TeleOpDatalogger {
         }
         previousYawRate = drive.yawRate
 
-        // ── Derived: flywheel RPM errors ──────────────────────────────────────
-        val fwPrimaryRpmError   = flywheel.leftShooterMotor.rpm   - flywheel.targetRpm
-        val fwSecondaryRpmError = flywheel.rightShooterMotor.rpm - flywheel.targetRpm
+        // ── Derived: flywheel RPM errors (Safe fallback if flywheel is null) ──
+        val fwPrimaryRpm = flywheel?.leftShooterMotor?.rpm ?: 0.0
+        val fwPrimaryRpmError = if (flywheel != null) fwPrimaryRpm - flywheel.targetRpm else 0.0
+        val fwSecondaryRpm = flywheel?.rightShooterMotor?.rpm ?: 0.0
+        val fwSecondaryRpmError = if (flywheel != null) fwSecondaryRpm - flywheel.targetRpm else 0.0
+
+        val intakeTel = intake.getTelemetry()
+
         log.writeRow(
             listOf(
                 // ── Timing ────────────────────────────────────────────────────
@@ -185,35 +190,58 @@ internal class TeleOpDatalogger {
                 "%.4f".format(drive.batteryVoltage),
 
                 // ── Flywheel summary ────────────────────────────────────────────
-                flywheel.enabled.i,
-                flywheel.atSpeed.i,
-                "%.2f".format(flywheel.targetRpm),
-                "%.2f".format(flywheel.shaftRpm),
-                "%.2f".format(flywheel.rpmDifference),
-                "%.4f".format(flywheel.surfaceSpeedMetersPerSecond),
-                "%.2f".format(flywheel.targetVelocity),
+                (flywheel?.enabled ?: false).i,
+                (flywheel?.atSpeed ?: false).i,
+                "%.2f".format(flywheel?.targetRpm ?: 0.0),
+                "%.2f".format(flywheel?.shaftRpm ?: 0.0),
+                "%.2f".format(flywheel?.rpmDifference ?: 0.0),
+                "%.4f".format(flywheel?.surfaceSpeedMetersPerSecond ?: 0.0),
+                "%.2f".format(flywheel?.targetVelocity ?: 0.0),
 
                 // ── Flywheel left motor ──────────────────────────────────────
-                "%.2f".format(flywheel.leftShooterMotor.rpm),
+                "%.2f".format(fwPrimaryRpm),
                 "%.2f".format(fwPrimaryRpmError),
-                "%.2f".format(flywheel.leftShooterMotor.velocity),
-                "%.4f".format(flywheel.leftShooterMotor.currentAmps),
-                flywheel.leftShooterMotor.encoderPosition,
-                "%.4f".format(flywheel.leftShooterMotor.motorPower),
+                "%.2f".format(flywheel?.leftShooterMotor?.velocity ?: 0.0),
+                "%.4f".format(flywheel?.leftShooterMotor?.currentAmps ?: 0.0),
+                flywheel?.leftShooterMotor?.encoderPosition ?: 0,
+                "%.4f".format(flywheel?.leftShooterMotor?.motorPower ?: 0.0),
 
                 // ── Flywheel right motor ────────────────────────────────────
-                "%.2f".format(flywheel.rightShooterMotor.rpm),
+                "%.2f".format(fwSecondaryRpm),
                 "%.2f".format(fwSecondaryRpmError),
-                "%.2f".format(flywheel.rightShooterMotor.velocity),
-                "%.4f".format(flywheel.rightShooterMotor.currentAmps),
-                flywheel.rightShooterMotor.encoderPosition,
-                "%.4f".format(flywheel.rightShooterMotor.motorPower),
+                "%.2f".format(flywheel?.rightShooterMotor?.velocity ?: 0.0),
+                "%.4f".format(flywheel?.rightShooterMotor?.currentAmps ?: 0.0),
+                flywheel?.rightShooterMotor?.encoderPosition ?: 0,
+                "%.4f".format(flywheel?.rightShooterMotor?.motorPower ?: 0.0),
 
-                // ── Intake ──────────────────────────────────────────────────────
-                "%.4f".format(intake.motorPower),
-                "%.4f".format(intake.hexMotorPower),
-                "%.4f".format(intake.servoLeftBelowPower),
-                "%.4f".format(intake.servoRightBelowPower),
+                // ── Intake & Linear Slide Extension ──────────────────────────────
+                intakeTel.state.name,
+                intakeTel.leftSlidePosition.name,
+                intakeTel.rightSlidePosition.name,
+                intakeTel.slidesSynchronized.i,
+                intakeTel.slideSkewState,
+                "%.4f".format(intakeTel.motorPower),
+                "%.4f".format(intakeTel.hexMotorPower),
+                "%.4f".format(intakeTel.servoLeftBelowPower),
+                "%.4f".format(intakeTel.servoRightBelowPower),
+                "%.4f".format(intakeTel.servoLeftAbovePower),
+                "%.4f".format(intakeTel.servoRightAbovePower),
+                intakeTel.leftLimitSwitchPressed.i,
+                intakeTel.rightLimitSwitchPressed.i,
+                intakeTel.bothLimitsPressed.i,
+                intakeTel.limitSyncState,
+                intakeTel.leftMagneticSwitchPressed.i,
+                intakeTel.rightMagneticSwitchPressed.i,
+                intakeTel.bothMagnetsDetected.i,
+                intakeTel.magnetSyncState,
+                intakeTel.leftMagnetConfirmed.i,
+                intakeTel.rightMagnetConfirmed.i,
+                intakeTel.bothMagnetsConfirmed.i,
+                intakeTel.intakeJamConfirmed.i,
+                intakeTel.transferJamConfirmed.i,
+                intakeTel.isUnjamming.i,
+                "%.4f".format(intakeTel.motorCurrentAmps),
+                "%.4f".format(intakeTel.hexMotorCurrentAmps),
             )
         )
     }
@@ -316,10 +344,21 @@ internal class TeleOpDatalogger {
             "fw_secondary_vel_ticks_s", "fw_secondary_current_a",
             "fw_secondary_enc_pos", "fw_secondary_power",
 
-            // Intake (5)
-            "intake_hex_enabled",
+            // Intake & Linear Slide Extension (27)
+            "intake_state", "intake_left_slide_pos", "intake_right_slide_pos",
+            "intake_slides_synced", "intake_slide_skew_state",
             "intake_motor_power", "intake_hex_motor_power",
-            "intake_servo1_power", "intake_servo2_power",
+            "intake_servo_left_below_power", "intake_servo_right_below_power",
+            "intake_servo_left_above_power", "intake_servo_right_above_power",
+            "intake_left_limit_pressed", "intake_right_limit_pressed",
+            "intake_both_limits_pressed", "intake_limit_sync_state",
+            "intake_left_mag_registered", "intake_right_mag_registered",
+            "intake_both_magnets_detected", "intake_magnet_sync_state",
+            "intake_left_mag_confirmed", "intake_right_mag_confirmed",
+            "intake_both_magnets_confirmed",
+            "intake_jam_confirmed", "intake_transfer_jam_confirmed",
+            "intake_is_unjamming",
+            "intake_motor_current_a", "intake_hex_motor_current_a",
         )
     }
 }

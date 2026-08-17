@@ -152,7 +152,7 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             rightShooterMotor.power = output * voltageNorm
 
 
-            if (DATALOG_ENABLED) {
+            if (DATALOG_ENABLED || FlywheelConfig.DATALOG_ENABLED) {
                 val leftState = motorTelemetry(leftShooterMotor)
                 val rightState = motorTelemetry(rightShooterMotor)
 
@@ -191,7 +191,22 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             rightShooterMotor.velocity = 0.0
             leftShooterMotor.power = 0.0
             rightShooterMotor.power = 0.0
-            return null;
+
+            if (DATALOG_ENABLED || FlywheelConfig.DATALOG_ENABLED) {
+                val leftState = motorTelemetry(leftShooterMotor)
+                val rightState = motorTelemetry(rightShooterMotor)
+                return FlywheelTelemetry(
+                    enabled = false,
+                    atSpeed = false,
+                    targetRpm = 0.0,
+                    targetVelocity = 0.0,
+                    leftShooterMotor = leftState,
+                    rightShooterMotor = rightState,
+                    shaftRpm = (leftState.rpm + rightState.rpm) / 2.0,
+                    rpmDifference = abs(leftState.rpm - rightState.rpm),
+                    surfaceSpeedMetersPerSecond = 0.0,
+                )
+            } else return null
         }
 
     }
