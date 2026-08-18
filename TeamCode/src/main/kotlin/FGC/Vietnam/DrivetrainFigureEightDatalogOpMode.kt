@@ -46,7 +46,8 @@ object DrivetrainFigureEightConfig {
     @JvmField var TURN_SETTLE_SECONDS = 0.15
 
     @JvmField var STEP_TIMEOUT_SECONDS = 12.0
-    @JvmField var FORWARD_DIRECTION_SIGN = 1.0 // Change to -1.0 if robot forward direction is inverted
+    // Matches TeleOp: FTC stick-forward is negative, and negative drive power is physical forward.
+    @JvmField var FORWARD_DIRECTION_SIGN = -1.0
     @JvmField var ENABLE_MANUAL_DRIVE_WHEN_IDLE = true
 }
 
@@ -244,7 +245,7 @@ class DrivetrainFigureEightDatalogOpMode : OpMode() {
         when (phase) {
             TestPhase.IDLE -> {
                 if (DrivetrainFigureEightConfig.ENABLE_MANUAL_DRIVE_WHEN_IDLE) {
-                    commandedForward = -gamepad1.left_stick_y.toDouble()
+                    commandedForward = gamepad1.left_stick_y.toDouble()
                     commandedTurn = gamepad1.right_stick_x.toDouble()
                 }
             }

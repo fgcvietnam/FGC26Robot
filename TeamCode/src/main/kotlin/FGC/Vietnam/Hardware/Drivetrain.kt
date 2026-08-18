@@ -302,8 +302,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         }
         wasUserTurning = userTurning
 
-        val isTranslating = abs(driveForward) > DrivetrainConfig.FORWARD_DEADBAND
-        if (activeHeadingHoldEnabled && isTranslating && !robotTilting && !isHeadingCorrectionTimedOut(currentTime)) {
+        if (activeHeadingHoldEnabled && !robotTilting && !isHeadingCorrectionTimedOut(currentTime)) {
             val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
 
             lastHeadingErrorDeg = Math.toDegrees(error)
@@ -315,6 +314,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 finalTurn = lastCorrectionPower
             } else {
                 lastCorrectionPower = 0.0
+                headingController.reset()
             }
         } else {
             lastCorrectionPower = 0.0
@@ -368,8 +368,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 headingHoldEnabled = activeHeadingHoldEnabled,
                 leftEncoderPosition = leftMotor.currentPosition,
                 rightEncoderPosition = rightMotor.currentPosition,
-                leftMotorPower = left,
-                rightMotorPower = right,
+                leftMotorPower = leftMotor.power,
+                rightMotorPower = rightMotor.power,
                 pitchDegrees = robotAngles.getPitch(AngleUnit.DEGREES),
                 rollDegrees = robotAngles.getRoll(AngleUnit.DEGREES),
                 pitchRate = angularVelocity.xRotationRate.toDouble(),
@@ -415,7 +415,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         lastTargetHeadingDeg = Math.toDegrees(customHeadingRad)
         lastTiltingSafety = robotTilting
 
-        if (holdHeading && DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION && !robotTilting && abs(driveForward) > 0.01) {
+        if (holdHeading && DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION && !robotTilting) {
             val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
             lastHeadingErrorDeg = Math.toDegrees(error)
 
@@ -425,6 +425,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 finalTurn += correction
             } else {
                 lastCorrectionPower = 0.0
+                headingController.reset()
             }
         } else {
             lastCorrectionPower = 0.0
@@ -478,8 +479,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 headingHoldEnabled = activeHeadingHoldEnabled,
                 leftEncoderPosition = leftMotor.currentPosition,
                 rightEncoderPosition = rightMotor.currentPosition,
-                leftMotorPower = left,
-                rightMotorPower = right,
+                leftMotorPower = leftMotor.power,
+                rightMotorPower = rightMotor.power,
                 pitchDegrees = robotAngles.getPitch(AngleUnit.DEGREES),
                 rollDegrees = robotAngles.getRoll(AngleUnit.DEGREES),
                 pitchRate = angularVelocity.xRotationRate.toDouble(),
@@ -499,10 +500,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
     }
 
     private fun setMotorPowersSmart(left: Double, right: Double, batteryVoltage: Double) {
-        val voltageNorm = if (batteryVoltage > 0.0) {
-            (RobotConfig.NOMINAL_BATTERY_VOLTAGE / batteryVoltage)
-                .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
-        } else 1.0
+        val voltageNorm = (batteryVoltage / RobotConfig.NOMINAL_BATTERY_VOLTAGE)
+            .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
         
         val lp = (left * voltageNorm).coerceIn(-1.0, 1.0)
         val rp = (right * voltageNorm).coerceIn(-1.0, 1.0)
