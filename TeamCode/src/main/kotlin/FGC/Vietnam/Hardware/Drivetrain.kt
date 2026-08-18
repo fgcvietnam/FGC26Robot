@@ -117,7 +117,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
             feedForward = headingFeedforward
         )
         headingController.setOutputLimits(-1.0, 1.0)
-        headingController.setIntegralLimits(-0.5, 0.5)
+        headingController.setIntegralLimits(-0.15, 0.15)
         headingController.setIntegralWindupProtection(true)
 
         imu.initialize(IMU.Parameters(RevHubOrientationOnRobot(
@@ -314,7 +314,6 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 finalTurn = lastCorrectionPower
             } else {
                 lastCorrectionPower = 0.0
-                headingController.reset()
             }
         } else {
             lastCorrectionPower = 0.0
@@ -341,8 +340,14 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         }
 
         if (RobotConfig.DATALOG_ENABLED || DrivetrainConfig.DATALOG_ENABLED) {
+            val isDatalogActive = RobotConfig.DATALOG_ENABLED || DrivetrainConfig.DATALOG_ENABLED
             val angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES)
-            val bestDetection = vision.getBestDetection()
+            val bestDetection = if (DrivetrainConfig.ENABLE_VISION_TELEMETRY) vision.getBestDetection() else null
+            val leftAmps = if (isDatalogActive || DrivetrainConfig.ENABLE_CURRENT_TELEMETRY) leftMotor.getCurrent(CurrentUnit.AMPS) else 0.0
+            val rightAmps = if (isDatalogActive || DrivetrainConfig.ENABLE_CURRENT_TELEMETRY) rightMotor.getCurrent(CurrentUnit.AMPS) else 0.0
+            val pitchRate = if (isDatalogActive || DrivetrainConfig.ENABLE_EXTENDED_IMU_TELEMETRY) angularVelocity.xRotationRate.toDouble() else 0.0
+            val rollRate = if (isDatalogActive || DrivetrainConfig.ENABLE_EXTENDED_IMU_TELEMETRY) angularVelocity.yRotationRate.toDouble() else 0.0
+
             return DriveTelemetry(
                 requestedForward = forward,
                 limitedForward = driveForward,
@@ -361,8 +366,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 leftActualVelocity = leftMotor.velocity,
                 rightTargetVelocity = right * rightMotor.motorType.achieveableMaxTicksPerSecond,
                 rightActualVelocity = rightMotor.velocity,
-                leftCurrentAmps = leftMotor.getCurrent(CurrentUnit.AMPS),
-                rightCurrentAmps = rightMotor.getCurrent(CurrentUnit.AMPS),
+                leftCurrentAmps = leftAmps,
+                rightCurrentAmps = rightAmps,
                 linearSpeedMmPerSecond = (leftMotor.velocity + rightMotor.velocity) / 2.0 * DrivetrainConfig.millimetersPerEncoderTick,
                 batteryVoltage = batteryVoltage,
                 headingHoldEnabled = activeHeadingHoldEnabled,
@@ -372,8 +377,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 rightMotorPower = rightMotor.power,
                 pitchDegrees = robotAngles.getPitch(AngleUnit.DEGREES),
                 rollDegrees = robotAngles.getRoll(AngleUnit.DEGREES),
-                pitchRate = angularVelocity.xRotationRate.toDouble(),
-                rollRate = angularVelocity.yRotationRate.toDouble(),
+                pitchRate = pitchRate,
+                rollRate = rollRate,
                 leftWheelSpeedMmPerSecond = leftMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
                 rightWheelSpeedMmPerSecond = rightMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
                 tiltingSafety = robotTilting,
@@ -420,12 +425,11 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
             lastHeadingErrorDeg = Math.toDegrees(error)
 
             if (abs(Math.toDegrees(error)) > DrivetrainConfig.ACTIVE_HEADING_HOLD_DEADBAND_DEG) {
-                val correction = headingController.calculate(error, 0.0).coerceIn(-0.35, 0.35)
+                val correction = headingController.calculate(error, 0.0).coerceIn(-0.45, 0.45)
                 lastCorrectionPower = correction
                 finalTurn += correction
             } else {
                 lastCorrectionPower = 0.0
-                headingController.reset()
             }
         } else {
             lastCorrectionPower = 0.0
@@ -452,8 +456,14 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         }
 
         if (RobotConfig.DATALOG_ENABLED || DrivetrainConfig.DATALOG_ENABLED) {
+            val isDatalogActive = RobotConfig.DATALOG_ENABLED || DrivetrainConfig.DATALOG_ENABLED
             val angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES)
-            val bestDetection = vision.getBestDetection()
+            val bestDetection = if (DrivetrainConfig.ENABLE_VISION_TELEMETRY) vision.getBestDetection() else null
+            val leftAmps = if (isDatalogActive || DrivetrainConfig.ENABLE_CURRENT_TELEMETRY) leftMotor.getCurrent(CurrentUnit.AMPS) else 0.0
+            val rightAmps = if (isDatalogActive || DrivetrainConfig.ENABLE_CURRENT_TELEMETRY) rightMotor.getCurrent(CurrentUnit.AMPS) else 0.0
+            val pitchRate = if (isDatalogActive || DrivetrainConfig.ENABLE_EXTENDED_IMU_TELEMETRY) angularVelocity.xRotationRate.toDouble() else 0.0
+            val rollRate = if (isDatalogActive || DrivetrainConfig.ENABLE_EXTENDED_IMU_TELEMETRY) angularVelocity.yRotationRate.toDouble() else 0.0
+
             return DriveTelemetry(
                 requestedForward = forward,
                 limitedForward = driveForward,
@@ -472,8 +482,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 leftActualVelocity = leftMotor.velocity,
                 rightTargetVelocity = right * rightMotor.motorType.achieveableMaxTicksPerSecond,
                 rightActualVelocity = rightMotor.velocity,
-                leftCurrentAmps = leftMotor.getCurrent(CurrentUnit.AMPS),
-                rightCurrentAmps = rightMotor.getCurrent(CurrentUnit.AMPS),
+                leftCurrentAmps = leftAmps,
+                rightCurrentAmps = rightAmps,
                 linearSpeedMmPerSecond = (leftMotor.velocity + rightMotor.velocity) / 2.0 * DrivetrainConfig.millimetersPerEncoderTick,
                 batteryVoltage = batteryVoltage,
                 headingHoldEnabled = activeHeadingHoldEnabled,
@@ -483,8 +493,8 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 rightMotorPower = rightMotor.power,
                 pitchDegrees = robotAngles.getPitch(AngleUnit.DEGREES),
                 rollDegrees = robotAngles.getRoll(AngleUnit.DEGREES),
-                pitchRate = angularVelocity.xRotationRate.toDouble(),
-                rollRate = angularVelocity.yRotationRate.toDouble(),
+                pitchRate = pitchRate,
+                rollRate = rollRate,
                 leftWheelSpeedMmPerSecond = leftMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
                 rightWheelSpeedMmPerSecond = rightMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
                 tiltingSafety = robotTilting,
@@ -500,8 +510,10 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
     }
 
     private fun setMotorPowersSmart(left: Double, right: Double, batteryVoltage: Double) {
-        val voltageNorm = (batteryVoltage / RobotConfig.NOMINAL_BATTERY_VOLTAGE)
-            .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
+        val voltageNorm = if (batteryVoltage > 0.0) {
+            (RobotConfig.NOMINAL_BATTERY_VOLTAGE / batteryVoltage)
+                .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
+        } else 1.0
         
         val lp = (left * voltageNorm).coerceIn(-1.0, 1.0)
         val rp = (right * voltageNorm).coerceIn(-1.0, 1.0)

@@ -39,10 +39,10 @@ object DrivetrainFigureEightConfig {
     @JvmField var DRIVE_SETTLE_SECONDS = 0.20
 
     // Turn limits & settle criteria (PID gains directly use DrivetrainConfig)
-    @JvmField var MAX_TURN_POWER = 0.60
-    @JvmField var MIN_TURN_POWER = 0.22
-    @JvmField var TURN_TOLERANCE_DEG = 1.5
-    @JvmField var TURN_MAX_VELOCITY_DEG_S = 8.0
+    @JvmField var MAX_TURN_POWER = 0.50
+    @JvmField var MIN_TURN_POWER = 0.10
+    @JvmField var TURN_TOLERANCE_DEG = 1.0
+    @JvmField var TURN_MAX_VELOCITY_DEG_S = 3.0
     @JvmField var TURN_SETTLE_SECONDS = 0.15
 
     @JvmField var STEP_TIMEOUT_SECONDS = 12.0
@@ -165,13 +165,16 @@ class DrivetrainFigureEightDatalogOpMode : OpMode() {
 
         lynxModules = hardwareMap.getAll(LynxModule::class.java)
         for (module in lynxModules) {
-            module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO)
+            module.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL)
         }
 
         DrivetrainConfig.DATALOG_ENABLED = true
         RobotConfig.DATALOG_ENABLED = true
         DrivetrainConfig.ENABLE_ACTIVE_HEADING_TUNING = true
         DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION = true
+        DrivetrainConfig.ENABLE_CURRENT_TELEMETRY = true
+        DrivetrainConfig.ENABLE_VISION_TELEMETRY = false
+        DrivetrainConfig.ENABLE_EXTENDED_IMU_TELEMETRY = true
 
         phase = TestPhase.IDLE
         currentCycle = 0
@@ -205,6 +208,7 @@ class DrivetrainFigureEightDatalogOpMode : OpMode() {
     }
 
     override fun loop() {
+        lynxModules.forEach { it.clearBulkCache() }
         val dtSec = loopTimer.seconds()
         loopTimer.reset()
 
@@ -434,26 +438,18 @@ class DrivetrainFigureEightDatalogOpMode : OpMode() {
         val minP = DrivetrainFigureEightConfig.MIN_TURN_POWER
         val maxP = DrivetrainFigureEightConfig.MAX_TURN_POWER
         val kp = DrivetrainConfig.ACTIVE_HEADING_KP
-        val ki = DrivetrainConfig.ACTIVE_HEADING_KI
         val kd = DrivetrainConfig.ACTIVE_HEADING_KD
-        val ks = DrivetrainConfig.ACTIVE_HEADING_KS
 
         val errorRad = Math.toRadians(errorDeg)
-        val safeDt = if (dtSec in 0.001..0.5) dtSec else 0.02
-
-        turnIntegral = (turnIntegral + errorRad * safeDt).coerceIn(-0.5, 0.5)
-        val derivative = (errorRad - lastTurnErrorRad) / safeDt
-        lastTurnErrorRad = errorRad
+        val yawRateRadPerSec = Math.toRadians(drivetrain.imu.getRobotAngularVelocity(AngleUnit.DEGREES).zRotationRate.toDouble())
 
         val p = errorRad * kp
-        val i = turnIntegral * ki
-        val d = derivative * kd
-        val ff = sign(errorRad) * ks
+        val d = -yawRateRadPerSec * kd
 
-        var total = p + i + d + ff
-        if (abs(errorDeg) > DrivetrainConfig.ACTIVE_HEADING_HOLD_DEADBAND_DEG) {
+        var total = p + d
+        if (abs(errorDeg) > 3.0 && abs(total) < minP) {
             val signVal = sign(total)
-            if (abs(total) < minP) total = signVal * minP
+            total = signVal * minP
         }
         return total.coerceIn(-maxP, maxP)
     }
@@ -502,6 +498,7 @@ class DrivetrainFigureEightDatalogOpMode : OpMode() {
 
         if (nextStep.isTurn) {
             phase = TestPhase.TURNING
+            drivetrain.setCustomHeadingDeg(nextStep.targetHeadingDeg)
             segmentProgressMeters = 0.0
             segmentRemainingMeters = 0.0
         } else {

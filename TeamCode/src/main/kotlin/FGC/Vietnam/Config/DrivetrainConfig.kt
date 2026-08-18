@@ -41,15 +41,20 @@ internal object DrivetrainConfig {
     @JvmField var ENABLE_ACTIVE_HEADING_CORRECTION = true
 
     @JvmField var LOCALIZER_ENABLE = true
-    @JvmField var ACTIVE_HEADING_KP = 3.0
-    @JvmField var ACTIVE_HEADING_KI = 2.0
-    @JvmField var ACTIVE_HEADING_KD = 0.4
-    @JvmField var ACTIVE_HEADING_KS = 0.1
-    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 1.0
+    @JvmField var ACTIVE_HEADING_KP = 2.60
+    @JvmField var ACTIVE_HEADING_KI = 0.15
+    @JvmField var ACTIVE_HEADING_KD = 0.55
+    @JvmField var ACTIVE_HEADING_KS = 0.02
+    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 0.0
     @JvmField var ACTIVE_HEADING_TURN_DEADBAND = 0.05
-    @JvmField var ACTIVE_HEADING_SETTLE_TIME_SECONDS = 0.25
+    @JvmField var ACTIVE_HEADING_SETTLE_TIME_SECONDS = 0.15
     @JvmField var MAX_TILT_FOR_HEADING_CORRECTION_DEG = 15.0
     @JvmField var DPAD_ORIENTATION_TIMEOUT_SECONDS = -1.0 // Disabled
+
+    // Performance & Optimization Toggles (for achieving 20ms - 50ms loop time)
+    @JvmField var ENABLE_CURRENT_TELEMETRY = false // Reading motor.getCurrent() takes ~10-15ms
+    @JvmField var ENABLE_VISION_TELEMETRY = false  // vision.getBestDetection() takes ~15-20ms
+    @JvmField var ENABLE_EXTENDED_IMU_TELEMETRY = true // pitch/roll rates
 
     const val LEFT_MOTOR_NAME = "driveLeft"
     const val RIGHT_MOTOR_NAME = "driveRight"

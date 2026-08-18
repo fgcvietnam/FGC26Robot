@@ -110,7 +110,7 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         allHubs = hardwareMap.getAll(LynxModule::class.java)
         lynxModules = allHubs
         for (module in allHubs) {
-            module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO)
+            module.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL)
         }
         val startingPose = when (alliance) {
             Alliance.BLUE -> Pose2d(
@@ -177,6 +177,7 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
     }
 
     override fun loop() {
+        allHubs.forEach { it.clearBulkCache() }
         val loopStartTime = getRuntime()
 
         packet = TelemetryPacket(false)
