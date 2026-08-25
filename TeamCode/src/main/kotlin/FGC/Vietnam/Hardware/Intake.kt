@@ -202,46 +202,57 @@ internal class Intake(hardwareMap: HardwareMap) {
 
 
     fun moveServosForward() {
-        if (rightMagnetConfirmed()) {
+        val rightReached = rightMagneticSwitch.isPressed || rightMagnetConfirmed()
+        if (rightReached) {
             servoRightBelow.power = 0.0
             servoRightAbove.power = 0.0
-            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDED;
+            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDED
         } else {
             servoRightBelow.power = 1.0
             servoRightAbove.power = 1.0
-            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
+            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDING
         }
 
-        if (leftMagnetConfirmed()) {
+        val leftReached = leftMagneticSwitch.isPressed || leftMagnetConfirmed()
+        if (leftReached) {
             servoLeftBelow.power = 0.0
             servoLeftAbove.power = 0.0
-            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDED;
+            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDED
         } else {
             servoLeftBelow.power = 1.0
             servoLeftAbove.power = 1.0
-            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
+            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDING
         }
+    }
 
+    fun isFullyExtended(): Boolean {
+        val leftReached = leftMagneticSwitch.isPressed || leftMagnetConfirmed()
+        val rightReached = rightMagneticSwitch.isPressed || rightMagnetConfirmed()
+        return leftReached && rightReached
+    }
+
+    fun isFullyRetracted(): Boolean {
+        return leftLimitSwitch.isPressed && rightLimitSwitch.isPressed
     }
 
     fun moveServosBackward() {
         if (rightLimitSwitch.isPressed) {
             servoRightBelow.power = 0.0
             servoRightAbove.power = 0.0
-            rightIntakeSlidePosition = IntakeSlidePosition.HOME;
+            rightIntakeSlidePosition = IntakeSlidePosition.HOME
         } else {
             servoRightBelow.power = -1.0
             servoRightAbove.power = -1.0
-            rightIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
+            rightIntakeSlidePosition = IntakeSlidePosition.RETRACTING
         }
         if (leftLimitSwitch.isPressed) {
             servoLeftBelow.power = 0.0
             servoLeftAbove.power = 0.0
-            leftIntakeSlidePosition = IntakeSlidePosition.HOME;
+            leftIntakeSlidePosition = IntakeSlidePosition.HOME
         } else {
             servoLeftBelow.power = -1.0
             servoLeftAbove.power = -1.0
-            leftIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
+            leftIntakeSlidePosition = IntakeSlidePosition.RETRACTING
         }
     }
 

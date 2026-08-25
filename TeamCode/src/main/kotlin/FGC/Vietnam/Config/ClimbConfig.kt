@@ -5,6 +5,10 @@ import com.acmerobotics.dashboard.config.Config
 
 @Config
 object ClimbConfig {
+    const val GEAR_REDUCTION = 99.0
+    const val MOTOR_ENCODER_TICKS_PER_REVOLUTION = 28.0
+    val encoderTicksPerShaftRevolution = MOTOR_ENCODER_TICKS_PER_REVOLUTION * GEAR_REDUCTION
+
     @JvmField var DATALOG_ENABLED = false
     @JvmField var CUT_OFF_INPUT = 0.7
 

@@ -1,3 +1,5 @@
+package fgc.vietnam.robot01.Hardware
+
 import com.qualcomm.hardware.rev.Rev2mDistanceSensor
 import com.qualcomm.robotcore.hardware.CRServo
 import com.qualcomm.robotcore.hardware.DcMotor
@@ -115,6 +117,83 @@ internal class Climb(hardwareMap: HardwareMap) {
 
     fun getMotorAbovePower(): Double = motorAbove.power
     fun getMotorBelowPower(): Double = motorBelow.power
+    fun getMotorAbovePosition(): Int = motorAbove.currentPosition
+    fun getMotorBelowPosition(): Int = motorBelow.currentPosition
+    fun getMotorAboveVelocity(): Double = motorAbove.velocity
+    fun getMotorBelowVelocity(): Double = motorBelow.velocity
     fun getClimbState(): String = state.name
     fun getServoPower(): Double = servoClimb.power
+    fun isShouldHold(): Boolean = shouldHold
+    fun getCurrentHoldPower(): Double = holdPower
+
+    fun getTelemetry(batteryVoltage: Double = 12.0): ClimbTelemetry {
+        val currentAbove = try { motorAbove.getCurrent(org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit.AMPS) } catch (_: Exception) { 0.0 }
+        val currentBelow = try { motorBelow.getCurrent(org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit.AMPS) } catch (_: Exception) { 0.0 }
+        val velAbove = motorAbove.velocity
+        val velBelow = motorBelow.velocity
+        val posAbove = motorAbove.currentPosition
+        val posBelow = motorBelow.currentPosition
+        val motorAboveRpm = velAbove * 60.0 / ClimbConfig.MOTOR_ENCODER_TICKS_PER_REVOLUTION
+        val motorBelowRpm = velBelow * 60.0 / ClimbConfig.MOTOR_ENCODER_TICKS_PER_REVOLUTION
+        val shaftAboveRpm = velAbove * 60.0 / ClimbConfig.encoderTicksPerShaftRevolution
+        val shaftBelowRpm = velBelow * 60.0 / ClimbConfig.encoderTicksPerShaftRevolution
+        val distMm = try { distanceSensor.getDistance(DistanceUnit.MM) } catch (_: Exception) { Double.NaN }
+
+        val pwrAboveWatts = currentAbove * batteryVoltage * kotlin.math.abs(motorAbove.power)
+        val pwrBelowWatts = currentBelow * batteryVoltage * kotlin.math.abs(motorBelow.power)
+
+        return ClimbTelemetry(
+            motorAbovePower = motorAbove.power,
+            motorBelowPower = motorBelow.power,
+            motorAbovePositionTicks = posAbove,
+            motorBelowPositionTicks = posBelow,
+            encoderPositionDiffTicks = posAbove - posBelow,
+            motorAboveVelocityTicksPerSec = velAbove,
+            motorBelowVelocityTicksPerSec = velBelow,
+            motorVelocityDiffTicksPerSec = velAbove - velBelow,
+            motorAboveRpm = motorAboveRpm,
+            motorBelowRpm = motorBelowRpm,
+            shaftAboveRpm = shaftAboveRpm,
+            shaftBelowRpm = shaftBelowRpm,
+            motorAboveCurrentAmps = currentAbove,
+            motorBelowCurrentAmps = currentBelow,
+            totalCurrentAmps = currentAbove + currentBelow,
+            currentDiffAmps = currentAbove - currentBelow,
+            motorAbovePowerWatts = pwrAboveWatts,
+            motorBelowPowerWatts = pwrBelowWatts,
+            totalPowerWatts = pwrAboveWatts + pwrBelowWatts,
+            servoPower = servoClimb.power,
+            distanceMm = distMm,
+            climbState = state.name,
+            shouldHold = shouldHold,
+            holdPower = holdPower
+        )
+    }
 }
+
+internal data class ClimbTelemetry(
+    val motorAbovePower: Double,
+    val motorBelowPower: Double,
+    val motorAbovePositionTicks: Int,
+    val motorBelowPositionTicks: Int,
+    val encoderPositionDiffTicks: Int,
+    val motorAboveVelocityTicksPerSec: Double,
+    val motorBelowVelocityTicksPerSec: Double,
+    val motorVelocityDiffTicksPerSec: Double,
+    val motorAboveRpm: Double,
+    val motorBelowRpm: Double,
+    val shaftAboveRpm: Double,
+    val shaftBelowRpm: Double,
+    val motorAboveCurrentAmps: Double,
+    val motorBelowCurrentAmps: Double,
+    val totalCurrentAmps: Double,
+    val currentDiffAmps: Double,
+    val motorAbovePowerWatts: Double,
+    val motorBelowPowerWatts: Double,
+    val totalPowerWatts: Double,
+    val servoPower: Double,
+    val distanceMm: Double,
+    val climbState: String,
+    val shouldHold: Boolean,
+    val holdPower: Double
+)

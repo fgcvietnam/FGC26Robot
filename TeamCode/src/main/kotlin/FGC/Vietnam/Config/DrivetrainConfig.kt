@@ -17,19 +17,19 @@ internal object DrivetrainConfig {
     // Drive shaping and limits
     @JvmField var DATALOG_ENABLED = false
     @JvmField var FORWARD_DEADBAND = 0.05
-    @JvmField var FORWARD_EXPO = 0.25
+    @JvmField var FORWARD_EXPO = 0.20
     @JvmField var TURN_DEADBAND = 0.05
-    @JvmField var TURN_EXPO = 0.25
+    @JvmField var TURN_EXPO = 0.20
     @JvmField var DRIVE_SPEED_MULTIPLIER = 1.0
     @JvmField var TURN_SPEED_MULTIPLIER = 1.0
     @JvmField var PRECISION_MODE_MULTIPLIER = 0.3
     @JvmField var MIN_DRIVE_POWER = 0.05
 
     // Turn boost
-    @JvmField var TURN_BOOST_START = 0.4
-    @JvmField var TURN_BOOST_END = 0.8
-    @JvmField var HIGH_SPEED_TURN_BOOST = 1.8
-    @JvmField var TURN_BOOST_EXPONENT = 2.0
+    @JvmField var TURN_BOOST_START = 0.5
+    @JvmField var TURN_BOOST_END = 0.9
+    @JvmField var HIGH_SPEED_TURN_BOOST = 1.2
+    @JvmField var TURN_BOOST_EXPONENT = 1.5
 
     // Voltage and Smart Power
     @JvmField var MIN_VOLTAGE_COMPENSATION = 0.8

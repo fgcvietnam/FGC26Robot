@@ -267,57 +267,61 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         val userTurnInput = turnShaped * turnMultiplier
         var finalTurn = userTurnInput
 
+        val userSteering = abs(turnShaped) > 0.02
+        val isDrivingStraight = abs(forwardShaped) > 0.08 && !userSteering
+
         val robotTilting =
             abs(robotAngles.getPitch(AngleUnit.DEGREES)) >
                     DrivetrainConfig.MAX_TILT_FOR_HEADING_CORRECTION_DEG ||
                     abs(robotAngles.getRoll(AngleUnit.DEGREES)) >
                     DrivetrainConfig.MAX_TILT_FOR_HEADING_CORRECTION_DEG
-        // Update heading telemetry state every drive cycle
+
         lastCurrentHeadingDeg = Math.toDegrees(currentHeadingRad)
         lastTargetHeadingDeg = Math.toDegrees(customHeadingRad)
         lastTiltingSafety = robotTilting
 
-        val userTurning = abs(userTurnInput) > DrivetrainConfig.ACTIVE_HEADING_TURN_DEADBAND
-
-        if (DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION && !robotTilting) {
-            if (!userTurning && wasUserTurning) {
-                lastTurnReleasedTime = currentTime
-                pendingHeadingLock = true
-            } else if (userTurning) {
-                activeHeadingHoldEnabled = false
-                pendingHeadingLock = false
-            }
-
-            if (pendingHeadingLock && !userTurning && (currentTime - lastTurnReleasedTime >= DrivetrainConfig.ACTIVE_HEADING_SETTLE_TIME_SECONDS)) {
-                if (!activeHeadingHoldEnabled) {
+        if (userSteering || !DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION || robotTilting) {
+            // Driver is actively steering: 100% direct manual authority, ZERO spring resistance
+            activeHeadingHoldEnabled = false
+            pendingHeadingLock = false
+            customHeadingRad = currentHeadingRad
+            headingController.reset()
+            lastCorrectionPower = 0.0
+            finalTurn = userTurnInput
+        } else if (isDrivingStraight) {
+            // Driver is driving straight: Auto-engage straight-line tracking once angular rotation settles
+            if (!activeHeadingHoldEnabled) {
+                val yawRate = abs(imu.getRobotAngularVelocity(AngleUnit.DEGREES).zRotationRate)
+                if (yawRate < 10.0) { // Rotation has settled, lock heading without snapping back
                     customHeadingRad = currentHeadingRad
                     activeHeadingHoldEnabled = true
                     headingController.reset()
                 }
-                pendingHeadingLock = false
             }
-        } else {
-            activeHeadingHoldEnabled = false
-            pendingHeadingLock = false
-        }
-        wasUserTurning = userTurning
 
-        if (activeHeadingHoldEnabled && !robotTilting && !isHeadingCorrectionTimedOut(currentTime)) {
-            val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
+            if (activeHeadingHoldEnabled && !isHeadingCorrectionTimedOut(currentTime)) {
+                val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
+                lastHeadingErrorDeg = Math.toDegrees(error)
 
-            lastHeadingErrorDeg = Math.toDegrees(error)
-            lastTargetHeadingDeg = Math.toDegrees(customHeadingRad)
-            lastCurrentHeadingDeg = Math.toDegrees(currentHeadingRad)
-
-            if (abs(Math.toDegrees(error)) > DrivetrainConfig.ACTIVE_HEADING_HOLD_DEADBAND_DEG) {
-                lastCorrectionPower = headingController.calculate(error, 0.0)
-                finalTurn = lastCorrectionPower
+                if (abs(Math.toDegrees(error)) > DrivetrainConfig.ACTIVE_HEADING_HOLD_DEADBAND_DEG) {
+                    lastCorrectionPower = headingController.calculate(error, 0.0).coerceIn(-0.35, 0.35)
+                    finalTurn = lastCorrectionPower
+                } else {
+                    lastCorrectionPower = 0.0
+                    finalTurn = 0.0
+                }
             } else {
                 lastCorrectionPower = 0.0
+                finalTurn = 0.0
             }
         } else {
-            lastCorrectionPower = 0.0
+            // Stopped / Coasting: No active spring torque
+            activeHeadingHoldEnabled = false
+            pendingHeadingLock = false
+            customHeadingRad = currentHeadingRad
             headingController.reset()
+            lastCorrectionPower = 0.0
+            finalTurn = 0.0
         }
 
         var left = driveForward - finalTurn

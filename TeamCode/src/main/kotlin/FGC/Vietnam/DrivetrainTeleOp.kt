@@ -1,6 +1,6 @@
 package FGC.Vietnam
 
-import Climb
+import fgc.vietnam.robot01.Hardware.Climb
 import RoadRunner.Drawing.drawRobot
 import android.graphics.Color
 import com.acmerobotics.dashboard.FtcDashboard
@@ -19,6 +19,7 @@ import FGC.Vietnam.Config.FlywheelConfig
 import FGC.Vietnam.Config.IntakeConfig
 import FGC.Vietnam.Config.RoadRunnerConfig
 import FGC.Vietnam.DataLogger.TeleOpDatalogger
+import FGC.Vietnam.DataLogger.TransferDatalogger
 import FGC.Vietnam.Utils.MotorTester
 import fgc.vietnam.robot01.Hardware.Drivetrain
 import fgc.vietnam.robot01.Hardware.Flywheel
@@ -35,13 +36,17 @@ enum class Alliance {
     RED
 }
 
-abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : OpMode() {
+abstract class CompDriveTeleOp protected constructor(
+    var alliance: Alliance,
+    var transferDatalogOnly: Boolean = false
+) : OpMode() {
     private lateinit var drivetrain: Drivetrain
     private lateinit var flywheel: Flywheel
     private lateinit var intake: Intake
     private lateinit var climb: Climb
     private lateinit var lynxModules: List<LynxModule>
     private val datalogger = TeleOpDatalogger()
+    private val transferDatalogger = TransferDatalogger()
 
     private var previousHeadingToggle = false
     private var previousDatalogToggle = false
@@ -174,6 +179,9 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         autoExtending = true
         autoExtendTimer.reset()
         drivetrain.imu.resetYaw()
+        if (transferDatalogOnly) {
+            transferDatalogger.startLogging(prefix = "transfer_test")
+        }
     }
 
     override fun loop() {
@@ -420,11 +428,17 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         if (drive != null) {
             val datalogToggle = (gamepad1.start && gamepad1.y) || (gamepad2.start && gamepad2.y)
             if (datalogToggle && !previousDatalogToggle) {
-                datalogger.toggleLogging()
+                if (transferDatalogOnly) {
+                    transferDatalogger.toggleLogging(prefix = "transfer_test")
+                } else {
+                    datalogger.toggleLogging()
+                }
             }
             previousDatalogToggle = datalogToggle
 
-            if (datalogger.isLogging) {
+            val isLogging = if (transferDatalogOnly) transferDatalogger.isLogging else datalogger.isLogging
+
+            if (isLogging) {
                 val nowMs = System.currentTimeMillis()
                 if (nowMs - lastTempQueryTimeMs >= 2000L || cachedHubTemps.isEmpty()) {
                     lastTempQueryTimeMs = nowMs
@@ -436,14 +450,28 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
                         }
                     }
                 }
-                datalogger.writeRow(
-                    gamepad1 = gamepad1,
-                    gamepad2 = gamepad2,
-                    drive = drive,
-                    flywheel = flywheelState,
-                    intake = intake,
-                    hubTemperaturesCelsius = cachedHubTemps,
-                )
+
+                if (transferDatalogOnly) {
+                    transferDatalogger.writeRow(
+                        intakeTelemetry = intake.getTelemetry(),
+                        flywheelTelemetry = flywheelState,
+                        batteryVoltage = voltageSensor.voltage,
+                        isTransferring = isTransferring,
+                        isOuttaking = isOuttaking,
+                        gamepad1 = gamepad1,
+                        gamepad2 = gamepad2,
+                        hubTemperaturesCelsius = cachedHubTemps
+                    )
+                } else {
+                    datalogger.writeRow(
+                        gamepad1 = gamepad1,
+                        gamepad2 = gamepad2,
+                        drive = drive,
+                        flywheel = flywheelState,
+                        intake = intake,
+                        hubTemperaturesCelsius = cachedHubTemps,
+                    )
+                }
             }
         }
 
@@ -563,9 +591,14 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
 
         telemetry.addData(
             "Datalog",
-            "%s rows=%d",
-            if (datalogger.isLogging) "● REC" else "○ off",
-            datalogger.rowCount,
+            "%s [%s] rows=%d",
+            if (transferDatalogOnly) {
+                if (transferDatalogger.isLogging) "● REC (Transfer Only)" else "○ off"
+            } else {
+                if (datalogger.isLogging) "● REC (Full TeleOp)" else "○ off"
+            },
+            if (transferDatalogOnly) "TRANSFER" else "FULL",
+            if (transferDatalogOnly) transferDatalogger.rowCount else datalogger.rowCount
         )
     }
 
@@ -575,6 +608,7 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         intake.stopMotor()
         intake.stopServos()
         datalogger.stopLogging()
+        transferDatalogger.stopLogging()
     }
 
     private fun deadband(value: Double): Double =
