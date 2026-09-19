@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.Hardware
+package FGC.Vietnam.Hardware
 
 import FGC.Vietnam.Config.DrivetrainConfig
 import FGC.Vietnam.Config.RobotConfig
@@ -72,8 +72,8 @@ internal data class DriveTelemetry(
 )
 
 internal class Drivetrain(private val hardwareMap: HardwareMap) {
-    private val leftMotor = motor(DrivetrainConfig.LEFT_MOTOR_NAME, DcMotorSimple.Direction.REVERSE)
-    private val rightMotor = motor(DrivetrainConfig.RIGHT_MOTOR_NAME, DcMotorSimple.Direction.FORWARD)
+    private val leftMotor = motor(DrivetrainConfig.LEFT_MOTOR_NAME, DcMotorSimple.Direction.FORWARD)
+    private val rightMotor = motor(DrivetrainConfig.RIGHT_MOTOR_NAME, DcMotorSimple.Direction.REVERSE)
 
     val imu = hardwareMap.get(IMU::class.java, DrivetrainConfig.IMU_NAME)
 
@@ -117,7 +117,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
             feedForward = headingFeedforward
         )
         headingController.setOutputLimits(-1.0, 1.0)
-        headingController.setIntegralLimits(-0.5, 0.5)
+        headingController.setIntegralLimits(-0.15, 0.15)
         headingController.setIntegralWindupProtection(true)
 
         imu.initialize(IMU.Parameters(RevHubOrientationOnRobot(
@@ -236,7 +236,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         return sign * ((1.0 - expo) * scaled + expo * scaled.pow(3))
     }
 
-    fun drive(forward: Double, turn: Double, precisionMode: Boolean = false, batteryVoltage: Double): DriveTelemetry? {
+    fun drive(forward: Double, turn: Double, precisionMode: Boolean = false, batteryVoltage: Double) {
         val robotAngles = imu.robotYawPitchRollAngles
         val currentHeadingRad = robotAngles.getYaw(AngleUnit.RADIANS)
 
@@ -267,58 +267,61 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         val userTurnInput = turnShaped * turnMultiplier
         var finalTurn = userTurnInput
 
+        val userSteering = abs(turnShaped) > 0.02
+        val isDrivingStraight = abs(forwardShaped) > 0.08 && !userSteering
+
         val robotTilting =
             abs(robotAngles.getPitch(AngleUnit.DEGREES)) >
                     DrivetrainConfig.MAX_TILT_FOR_HEADING_CORRECTION_DEG ||
                     abs(robotAngles.getRoll(AngleUnit.DEGREES)) >
                     DrivetrainConfig.MAX_TILT_FOR_HEADING_CORRECTION_DEG
-        // Update heading telemetry state every drive cycle
+
         lastCurrentHeadingDeg = Math.toDegrees(currentHeadingRad)
         lastTargetHeadingDeg = Math.toDegrees(customHeadingRad)
         lastTiltingSafety = robotTilting
 
-        val userTurning = abs(userTurnInput) > DrivetrainConfig.ACTIVE_HEADING_TURN_DEADBAND
-
-        if (DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION && !robotTilting) {
-            if (!userTurning && wasUserTurning) {
-                lastTurnReleasedTime = currentTime
-                pendingHeadingLock = true
-            } else if (userTurning) {
-                activeHeadingHoldEnabled = false
-                pendingHeadingLock = false
-            }
-
-            if (pendingHeadingLock && !userTurning && (currentTime - lastTurnReleasedTime >= DrivetrainConfig.ACTIVE_HEADING_SETTLE_TIME_SECONDS)) {
-                if (!activeHeadingHoldEnabled) {
+        if (userSteering || !DrivetrainConfig.ENABLE_ACTIVE_HEADING_CORRECTION || robotTilting) {
+            // Driver is actively steering: 100% direct manual authority, ZERO spring resistance
+            activeHeadingHoldEnabled = false
+            pendingHeadingLock = false
+            customHeadingRad = currentHeadingRad
+            headingController.reset()
+            lastCorrectionPower = 0.0
+            finalTurn = userTurnInput
+        } else if (isDrivingStraight) {
+            // Driver is driving straight: Auto-engage straight-line tracking once angular rotation settles
+            if (!activeHeadingHoldEnabled) {
+                val yawRate = abs(imu.getRobotAngularVelocity(AngleUnit.DEGREES).zRotationRate)
+                if (yawRate < 10.0) { // Rotation has settled, lock heading without snapping back
                     customHeadingRad = currentHeadingRad
                     activeHeadingHoldEnabled = true
                     headingController.reset()
                 }
-                pendingHeadingLock = false
             }
-        } else {
-            activeHeadingHoldEnabled = false
-            pendingHeadingLock = false
-        }
-        wasUserTurning = userTurning
 
-        if (activeHeadingHoldEnabled && !robotTilting && !isHeadingCorrectionTimedOut(currentTime)) {
-            val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
+            if (activeHeadingHoldEnabled && !isHeadingCorrectionTimedOut(currentTime)) {
+                val error = minimalAngleDifference(customHeadingRad, currentHeadingRad)
+                lastHeadingErrorDeg = Math.toDegrees(error)
 
-            lastHeadingErrorDeg = Math.toDegrees(error)
-            lastTargetHeadingDeg = Math.toDegrees(customHeadingRad)
-            lastCurrentHeadingDeg = Math.toDegrees(currentHeadingRad)
-
-            if (abs(Math.toDegrees(error)) > DrivetrainConfig.ACTIVE_HEADING_HOLD_DEADBAND_DEG) {
-                lastCorrectionPower = headingController.calculate(error, 0.0)
-                finalTurn = lastCorrectionPower
+                if (abs(Math.toDegrees(error)) > DrivetrainConfig.ACTIVE_HEADING_HOLD_DEADBAND_DEG) {
+                    lastCorrectionPower = headingController.calculate(error, 0.0).coerceIn(-0.35, 0.35)
+                    finalTurn = lastCorrectionPower
+                } else {
+                    lastCorrectionPower = 0.0
+                    finalTurn = 0.0
+                }
             } else {
                 lastCorrectionPower = 0.0
-                headingController.reset()
+                finalTurn = 0.0
             }
         } else {
-            lastCorrectionPower = 0.0
+            // Stopped / Coasting: No active spring torque
+            activeHeadingHoldEnabled = false
+            pendingHeadingLock = false
+            customHeadingRad = currentHeadingRad
             headingController.reset()
+            lastCorrectionPower = 0.0
+            finalTurn = 0.0
         }
 
         var left = driveForward - finalTurn
@@ -339,58 +342,14 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
                 )
             )
         }
-
-        if (RobotConfig.DATALOG_ENABLED) {
-            val angularVelocity = imu.getRobotAngularVelocity(AngleUnit.DEGREES)
-            val bestDetection = vision.getBestDetection()
-            return DriveTelemetry(
-                requestedForward = forward,
-                limitedForward = driveForward,
-                requestedTurn = turn,
-                heading = Math.toDegrees(currentHeadingRad),
-                targetHeading = Math.toDegrees(customHeadingRad),
-                headingError = Math.toDegrees(
-                    minimalAngleDifference(customHeadingRad, currentHeadingRad)
-                ),
-                headingCorrection = lastCorrectionPower,
-                proportionalCorrection = headingController.lastProportional,
-                integralCorrection = headingController.lastIntegral,
-                derivativeCorrection = headingController.lastDerivative,
-                yawRate = angularVelocity.zRotationRate.toDouble(),
-                leftTargetVelocity = left * leftMotor.motorType.achieveableMaxTicksPerSecond,
-                leftActualVelocity = leftMotor.velocity,
-                rightTargetVelocity = right * rightMotor.motorType.achieveableMaxTicksPerSecond,
-                rightActualVelocity = rightMotor.velocity,
-                leftCurrentAmps = leftMotor.getCurrent(CurrentUnit.AMPS),
-                rightCurrentAmps = rightMotor.getCurrent(CurrentUnit.AMPS),
-                linearSpeedMmPerSecond = (leftMotor.velocity + rightMotor.velocity) / 2.0 * DrivetrainConfig.millimetersPerEncoderTick,
-                batteryVoltage = batteryVoltage,
-                headingHoldEnabled = activeHeadingHoldEnabled,
-                leftEncoderPosition = leftMotor.currentPosition,
-                rightEncoderPosition = rightMotor.currentPosition,
-                leftMotorPower = left,
-                rightMotorPower = right,
-                pitchDegrees = robotAngles.getPitch(AngleUnit.DEGREES),
-                rollDegrees = robotAngles.getRoll(AngleUnit.DEGREES),
-                pitchRate = angularVelocity.xRotationRate.toDouble(),
-                rollRate = angularVelocity.yRotationRate.toDouble(),
-                leftWheelSpeedMmPerSecond = leftMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
-                rightWheelSpeedMmPerSecond = rightMotor.velocity * DrivetrainConfig.millimetersPerEncoderTick,
-                tiltingSafety = robotTilting,
-                highSpeedTurnBoostActive = highSpeedTurnBoostActive,
-                poseX = currentPose.position.x,
-                poseY = currentPose.position.y,
-                poseHeading = Math.toDegrees(currentPose.heading.toDouble()),
-                visionActive = bestDetection != null,
-                bestDetectionId = bestDetection?.id ?: -1
-            )
-        }
-        return null
     }
 
+
     private fun setMotorPowersSmart(left: Double, right: Double, batteryVoltage: Double) {
-        val voltageNorm = (batteryVoltage / RobotConfig.NOMINAL_BATTERY_VOLTAGE)
-            .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
+        val voltageNorm = if (batteryVoltage > 0.0) {
+            (RobotConfig.NOMINAL_BATTERY_VOLTAGE / batteryVoltage)
+                .coerceIn(DrivetrainConfig.MIN_VOLTAGE_COMPENSATION, DrivetrainConfig.MAX_VOLTAGE_COMPENSATION)
+        } else 1.0
         
         val lp = (left * voltageNorm).coerceIn(-1.0, 1.0)
         val rp = (right * voltageNorm).coerceIn(-1.0, 1.0)
@@ -431,6 +390,7 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         activeHeadingHoldEnabled = false
         pendingHeadingLock = false
         headingController.reset()
+        vision.stop()
     }
 
     private fun minimalAngleDifference(target: Double, current: Double): Double {
@@ -457,6 +417,22 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
     }
 
     fun getCustomHeadingRad(): Double = customHeadingRad
+
+    fun getLeftEncoderPosition(): Int = leftMotor.currentPosition
+    fun getRightEncoderPosition(): Int = rightMotor.currentPosition
+
+    fun setCustomHeadingDeg(headingDeg: Double) {
+        customHeadingRad = Math.toRadians(headingDeg)
+        activeHeadingHoldEnabled = true
+        headingController.reset()
+    }
+
+    fun resetHeading(targetHeadingDeg: Double = 0.0) {
+        imu.resetYaw()
+        customHeadingRad = Math.toRadians(targetHeadingDeg)
+        activeHeadingHoldEnabled = true
+        headingController.reset()
+    }
 
 
     /**

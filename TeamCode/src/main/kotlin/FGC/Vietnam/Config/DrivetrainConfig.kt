@@ -15,20 +15,21 @@ internal object DrivetrainConfig {
     val encoderTicksPerWheelRevolution = MOTOR_ENCODER_TICKS_PER_REVOLUTION * GEAR_REDUCTION
     val millimetersPerEncoderTick = PI * WHEEL_DIAMETER_MM / encoderTicksPerWheelRevolution
     // Drive shaping and limits
+    @JvmField var DATALOG_ENABLED = false
     @JvmField var FORWARD_DEADBAND = 0.05
-    @JvmField var FORWARD_EXPO = 0.25
+    @JvmField var FORWARD_EXPO = 0.20
     @JvmField var TURN_DEADBAND = 0.05
-    @JvmField var TURN_EXPO = 0.25
+    @JvmField var TURN_EXPO = 0.20
     @JvmField var DRIVE_SPEED_MULTIPLIER = 1.0
     @JvmField var TURN_SPEED_MULTIPLIER = 1.0
     @JvmField var PRECISION_MODE_MULTIPLIER = 0.3
     @JvmField var MIN_DRIVE_POWER = 0.05
 
     // Turn boost
-    @JvmField var TURN_BOOST_START = 0.4
-    @JvmField var TURN_BOOST_END = 0.8
-    @JvmField var HIGH_SPEED_TURN_BOOST = 1.8
-    @JvmField var TURN_BOOST_EXPONENT = 2.0
+    @JvmField var TURN_BOOST_START = 0.5
+    @JvmField var TURN_BOOST_END = 0.9
+    @JvmField var HIGH_SPEED_TURN_BOOST = 1.2
+    @JvmField var TURN_BOOST_EXPONENT = 1.5
 
     // Voltage and Smart Power
     @JvmField var MIN_VOLTAGE_COMPENSATION = 0.8
@@ -37,16 +38,16 @@ internal object DrivetrainConfig {
 
     // Active Heading Correction
     @JvmField var ENABLE_ACTIVE_HEADING_TUNING = false
-    @JvmField var ENABLE_ACTIVE_HEADING_CORRECTION = true
+    @JvmField var ENABLE_ACTIVE_HEADING_CORRECTION = false
 
     @JvmField var LOCALIZER_ENABLE = true
-    @JvmField var ACTIVE_HEADING_KP = 3.0
-    @JvmField var ACTIVE_HEADING_KI = 2.0
-    @JvmField var ACTIVE_HEADING_KD = 0.4
-    @JvmField var ACTIVE_HEADING_KS = 0.1
-    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 1
+    @JvmField var ACTIVE_HEADING_KP = 2.60
+    @JvmField var ACTIVE_HEADING_KI = 0.15
+    @JvmField var ACTIVE_HEADING_KD = 0.55
+    @JvmField var ACTIVE_HEADING_KS = 0.02
+    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 0.0
     @JvmField var ACTIVE_HEADING_TURN_DEADBAND = 0.05
-    @JvmField var ACTIVE_HEADING_SETTLE_TIME_SECONDS = 0.3
+    @JvmField var ACTIVE_HEADING_SETTLE_TIME_SECONDS = 0.15
     @JvmField var MAX_TILT_FOR_HEADING_CORRECTION_DEG = 15.0
     @JvmField var DPAD_ORIENTATION_TIMEOUT_SECONDS = -1.0 // Disabled
 

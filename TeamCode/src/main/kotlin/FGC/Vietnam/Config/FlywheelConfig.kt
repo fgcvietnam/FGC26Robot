@@ -7,11 +7,7 @@ import kotlin.math.PI
 internal object FlywheelConfig {
     const val LEFT_SHOOTER_MOTOR = "leftShooterMotor"
     const val RIGHT_SHOOTER_MOTOR = "rightShooterMotor"
-    const val GEAR_REDUCTION = 1.0
-    const val MOTOR_ENCODER_TICKS_PER_REVOLUTION = 28.0
-    const val WHEEL_DIAMETER_MM = 90.0
-    @JvmField var DEFAULT_RPM = 1_800.0
-
+    @JvmField var DEFAULT_RPM = 1400.0
     @JvmField var PIDF_P = 0.001
     @JvmField var PIDF_I = 0.0
     @JvmField var PIDF_D = 0.00001
@@ -24,15 +20,10 @@ internal object FlywheelConfig {
 
 
     const val ENCODER_MIN_VELOCITY = 100.0
-    const val ENCODER_MISMATCH_RATIO = 0.10      // 10%
+    const val ENCODER_MISMATCH_RATIO = 0.10
     const val ENCODER_MISMATCH_TIME_MS = 250L
 
     const val READY_ERROR_RATIO = 0.05
 
     const val MIN_READY_ERROR_RPM = 100.0
-    val encoderTicksPerWheelRevolution = MOTOR_ENCODER_TICKS_PER_REVOLUTION * GEAR_REDUCTION
-
-    fun rpmToTicksPerSecond(rpm: Double) = rpm * encoderTicksPerWheelRevolution / 60.0
-    fun ticksPerSecondToRpm(ticksPerSecond: Double) = ticksPerSecond * 60.0 / encoderTicksPerWheelRevolution
-    fun rpmToSurfaceSpeedMetersPerSecond(rpm: Double) = rpm / 60.0 * PI * WHEEL_DIAMETER_MM / 1_000.0
 }

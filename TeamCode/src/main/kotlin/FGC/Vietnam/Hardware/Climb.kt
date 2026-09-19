@@ -1,3 +1,5 @@
+package FGC.Vietnam.Hardware
+
 import com.qualcomm.hardware.rev.Rev2mDistanceSensor
 import com.qualcomm.robotcore.hardware.CRServo
 import com.qualcomm.robotcore.hardware.DcMotor
@@ -6,6 +8,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple
 import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.util.ElapsedTime
 import FGC.Vietnam.Config.ClimbConfig
+import com.qualcomm.robotcore.hardware.Servo
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 
 internal class Climb(hardwareMap: HardwareMap) {
@@ -27,7 +30,7 @@ internal class Climb(hardwareMap: HardwareMap) {
     }
 
     private val motorBelow = hardwareMap.get(DcMotorEx::class.java, "climbBelow").apply {
-        direction = DcMotorSimple.Direction.FORWARD
+        direction = DcMotorSimple.Direction.REVERSE
         zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
         mode = DcMotor.RunMode.RUN_USING_ENCODER
         power = 0.0
@@ -35,6 +38,10 @@ internal class Climb(hardwareMap: HardwareMap) {
 
     private val servoClimb = hardwareMap.get(CRServo::class.java, "climbServo").apply {
         direction = DcMotorSimple.Direction.REVERSE
+    }
+
+    private val servoHook = hardwareMap.get(Servo::class.java, "hookServo").apply {
+        position = 0.5
     }
 
     private val distanceSensor = hardwareMap.get(Rev2mDistanceSensor::class.java, "climbDistanceSensor")
@@ -50,6 +57,10 @@ internal class Climb(hardwareMap: HardwareMap) {
         holdPowerTimer.reset()
 
         state = ClimbState.CLIMBING
+    }
+
+    fun climbHookOpen(){
+        servoHook.position = 1.0;
     }
 
 
@@ -115,6 +126,40 @@ internal class Climb(hardwareMap: HardwareMap) {
 
     fun getMotorAbovePower(): Double = motorAbove.power
     fun getMotorBelowPower(): Double = motorBelow.power
+    fun getMotorAbovePosition(): Int = motorAbove.currentPosition
+    fun getMotorBelowPosition(): Int = motorBelow.currentPosition
+    fun getMotorAboveVelocity(): Double = motorAbove.velocity
+    fun getMotorBelowVelocity(): Double = motorBelow.velocity
     fun getClimbState(): String = state.name
     fun getServoPower(): Double = servoClimb.power
+    fun isShouldHold(): Boolean = shouldHold
+    fun getCurrentHoldPower(): Double = holdPower
+
 }
+
+internal data class ClimbTelemetry(
+    val motorAbovePower: Double,
+    val motorBelowPower: Double,
+    val motorAbovePositionTicks: Int,
+    val motorBelowPositionTicks: Int,
+    val encoderPositionDiffTicks: Int,
+    val motorAboveVelocityTicksPerSec: Double,
+    val motorBelowVelocityTicksPerSec: Double,
+    val motorVelocityDiffTicksPerSec: Double,
+    val motorAboveRpm: Double,
+    val motorBelowRpm: Double,
+    val shaftAboveRpm: Double,
+    val shaftBelowRpm: Double,
+    val motorAboveCurrentAmps: Double,
+    val motorBelowCurrentAmps: Double,
+    val totalCurrentAmps: Double,
+    val currentDiffAmps: Double,
+    val motorAbovePowerWatts: Double,
+    val motorBelowPowerWatts: Double,
+    val totalPowerWatts: Double,
+    val servoPower: Double,
+    val distanceMm: Double,
+    val climbState: String,
+    val shouldHold: Boolean,
+    val holdPower: Double
+)

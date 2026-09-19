@@ -161,7 +161,8 @@ public class IgnitingInnovationAprilTagSample extends LinearOpMode {
 
         builder.addProcessor(aprilTag);
 
-        builder.setCameraResolution(new Size(1280, 720));
+        builder.setCameraResolution(new Size(640, 480));
+        builder.setStreamFormat(VisionPortal.StreamFormat.MJPEG);
 
         visionPortal = builder.build();
         // Set the webcam (name is assumed to be "Webcam 1")

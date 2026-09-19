@@ -1,7 +1,7 @@
 package FGC.Vietnam.Hardware
+
 import android.util.Size
 import com.acmerobotics.roadrunner.Pose2d
-import com.acmerobotics.roadrunner.Rotation2d
 import com.qualcomm.robotcore.hardware.HardwareMap
 import FGC.Vietnam.Config.VisionConfig
 import global.first.IgnitingInnovationGameDatabase
@@ -11,7 +11,6 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.vision.VisionPortal
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
-
 
 internal class Vision(hardwareMap: HardwareMap) {
     private val aprilTag: AprilTagProcessor = AprilTagProcessor.Builder()
@@ -25,11 +24,11 @@ internal class Vision(hardwareMap: HardwareMap) {
         .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
         .build()
 
-
     private val portal: VisionPortal? = VisionPortal.Builder()
         .setCamera(hardwareMap.get<WebcamName>(WebcamName::class.java, "Webcam"))
         .addProcessor(aprilTag)
-        .setCameraResolution(Size(1280, 720))
+        .setCameraResolution(Size(640, 480))
+        .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
         .build()
 
     fun getBestDetection(): AprilTagDetection? {
@@ -45,5 +44,9 @@ internal class Vision(hardwareMap: HardwareMap) {
             robotPose.position.y,
             robotPose.orientation.getYaw(AngleUnit.RADIANS)
         )
+    }
+
+    fun stop() {
+        portal?.close()
     }
 }

@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.Hardware
+package FGC.Vietnam.Hardware
 
 import com.qualcomm.hardware.rev.RevTouchSensor
 import com.qualcomm.robotcore.hardware.CRServo
@@ -12,6 +12,34 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 
 enum class IntakeState { OFF, INTAKE, OUTTAKE, TRANSFER}
 enum class IntakeSlidePosition { HOME, EXTENDED, EXTENDING, RETRACTING, UNKNOWN }
+
+internal data class IntakeTelemetry(
+    val state: IntakeState,
+    val leftSlidePosition: IntakeSlidePosition,
+    val rightSlidePosition: IntakeSlidePosition,
+    val slidesSynchronized: Boolean,
+    val slideSkewState: String,
+    val motorPower: Double,
+    val hexMotorPower: Double,
+    val servoLeftBelowPower: Double,
+    val servoRightBelowPower: Double,
+    val leftLimitSwitchPressed: Boolean,
+    val rightLimitSwitchPressed: Boolean,
+    val bothLimitsPressed: Boolean,
+    val limitSyncState: String,
+    val leftMagneticSwitchPressed: Boolean,
+    val rightMagneticSwitchPressed: Boolean,
+    val bothMagnetsDetected: Boolean,
+    val magnetSyncState: String,
+    val leftMagnetConfirmed: Boolean,
+    val rightMagnetConfirmed: Boolean,
+    val bothMagnetsConfirmed: Boolean,
+    val intakeJamConfirmed: Boolean,
+    val transferJamConfirmed: Boolean,
+    val isUnjamming: Boolean,
+    val motorCurrentAmps: Double,
+    val hexMotorCurrentAmps: Double,
+)
 
 internal class Intake(hardwareMap: HardwareMap) {
 
@@ -35,18 +63,11 @@ internal class Intake(hardwareMap: HardwareMap) {
         power = 0.0
     }
 
-    private val servoLeftBelow = hardwareMap.get(CRServo::class.java, "leftBelowIntakeServo").apply {
+    private val servoLeftBelow = hardwareMap.get(CRServo::class.java, "leftIntakeServo").apply {
         direction = DcMotorSimple.Direction.REVERSE
     }
-    private val servoRightBelow = hardwareMap.get(CRServo::class.java, "rightBelowIntakeServo").apply {
+    private val servoRightBelow = hardwareMap.get(CRServo::class.java, "rightIntakeServo").apply {
         direction = DcMotorSimple.Direction.FORWARD
-    }
-
-    private val servoLeftAbove = hardwareMap.get(CRServo::class.java, "leftAboveIntakeServo").apply {
-        direction = DcMotorSimple.Direction.FORWARD
-    }
-    private val servoRightAbove = hardwareMap.get(CRServo::class.java, "rightAboveIntakeServo").apply {
-        direction = DcMotorSimple.Direction.REVERSE
     }
 
     private val leftLimitSwitch = hardwareMap.get(RevTouchSensor::class.java, "leftLimitSwitchExtension")
@@ -54,14 +75,12 @@ internal class Intake(hardwareMap: HardwareMap) {
 
     private val rightMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "rightMagneticSwitchExtension")
     private val leftMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "leftMagneticSwitchExtension")
-    private var state: IntakeState = IntakeState.INTAKE
+    private var state: IntakeState = IntakeState.OFF
 
     val motorPower: Double get() = motor.power
     val hexMotorPower: Double get() = hexMotor.power
     val servoRightBelowPower: Double get() = servoRightBelow.power
     val servoLeftBelowPower: Double get() = servoLeftBelow.power
-    val servoRightAbovePower: Double get() = servoRightAbove.power
-    val servoLeftAbovePower: Double get() = servoLeftAbove.power
     private val leftMagnetTimer = ElapsedTime()
     private val rightMagnetTimer = ElapsedTime()
     private var leftMagnetTiming = false
@@ -172,54 +191,55 @@ internal class Intake(hardwareMap: HardwareMap) {
 
 
     fun moveServosForward() {
-        if (rightMagnetConfirmed()) {
+        val rightReached = rightMagneticSwitch.isPressed || rightMagnetConfirmed()
+        if (rightReached) {
             servoRightBelow.power = 0.0
-            servoRightAbove.power = 0.0
-            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDED;
+            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDED
         } else {
             servoRightBelow.power = 1.0
-            servoRightAbove.power = 1.0
-            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
+            rightIntakeSlidePosition = IntakeSlidePosition.EXTENDING
         }
 
-        if (leftMagnetConfirmed()) {
+        val leftReached = leftMagneticSwitch.isPressed || leftMagnetConfirmed()
+        if (leftReached) {
             servoLeftBelow.power = 0.0
-            servoLeftAbove.power = 0.0
-            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDED;
+            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDED
         } else {
             servoLeftBelow.power = 1.0
-            servoLeftAbove.power = 1.0
-            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDING;
+            leftIntakeSlidePosition = IntakeSlidePosition.EXTENDING
         }
+    }
 
+    fun isFullyExtended(): Boolean {
+        val leftReached = leftMagneticSwitch.isPressed || leftMagnetConfirmed()
+        val rightReached = rightMagneticSwitch.isPressed || rightMagnetConfirmed()
+        return leftReached && rightReached
+    }
+
+    fun isFullyRetracted(): Boolean {
+        return leftLimitSwitch.isPressed && rightLimitSwitch.isPressed
     }
 
     fun moveServosBackward() {
         if (rightLimitSwitch.isPressed) {
             servoRightBelow.power = 0.0
-            servoRightAbove.power = 0.0
-            rightIntakeSlidePosition = IntakeSlidePosition.HOME;
+            rightIntakeSlidePosition = IntakeSlidePosition.HOME
         } else {
             servoRightBelow.power = -1.0
-            servoRightAbove.power = -1.0
-            rightIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
+            rightIntakeSlidePosition = IntakeSlidePosition.RETRACTING
         }
         if (leftLimitSwitch.isPressed) {
             servoLeftBelow.power = 0.0
-            servoLeftAbove.power = 0.0
-            leftIntakeSlidePosition = IntakeSlidePosition.HOME;
+            leftIntakeSlidePosition = IntakeSlidePosition.HOME
         } else {
             servoLeftBelow.power = -1.0
-            servoLeftAbove.power = -1.0
-            leftIntakeSlidePosition = IntakeSlidePosition.RETRACTING;
+            leftIntakeSlidePosition = IntakeSlidePosition.RETRACTING
         }
     }
 
     fun stopServos() {
         servoLeftBelow.power = 0.0
         servoRightBelow.power = 0.0
-        servoLeftAbove.power = 0.0
-        servoRightAbove.power = 0.0
     }
 
     fun rightLimitSwitchIsPressed(): Boolean {
@@ -263,6 +283,39 @@ internal class Intake(hardwareMap: HardwareMap) {
     }
 
 
+    fun bothMagnetsRegistered(): Boolean =
+        leftMagneticSwitch.isPressed && rightMagneticSwitch.isPressed
+
+    fun bothMagnetsConfirmed(): Boolean =
+        leftMagnetConfirmed() && rightMagnetConfirmed()
+
+    fun getMagnetSyncState(): String = when {
+        leftMagneticSwitch.isPressed && rightMagneticSwitch.isPressed -> "BOTH_DETECTED"
+        leftMagneticSwitch.isPressed && !rightMagneticSwitch.isPressed -> "LEFT_ONLY_ASYNC"
+        !leftMagneticSwitch.isPressed && rightMagneticSwitch.isPressed -> "RIGHT_ONLY_ASYNC"
+        else -> "NONE"
+    }
+
+    fun bothLimitsPressed(): Boolean =
+        leftLimitSwitch.isPressed && rightLimitSwitch.isPressed
+
+    fun getLimitSyncState(): String = when {
+        leftLimitSwitch.isPressed && rightLimitSwitch.isPressed -> "BOTH_HOME"
+        leftLimitSwitch.isPressed && !rightLimitSwitch.isPressed -> "LEFT_HOME_ASYNC"
+        !leftLimitSwitch.isPressed && rightLimitSwitch.isPressed -> "RIGHT_HOME_ASYNC"
+        else -> "NONE"
+    }
+
+    fun areSlidesSynchronized(): Boolean =
+        leftIntakeSlidePosition == rightIntakeSlidePosition
+
+    fun getSlideSkewState(): String =
+        if (leftIntakeSlidePosition == rightIntakeSlidePosition) {
+            leftIntakeSlidePosition.name
+        } else {
+            "${leftIntakeSlidePosition.name}_VS_${rightIntakeSlidePosition.name}"
+        }
+
     fun intakeJamConfirm(): Boolean {
         return intakeJamTiming &&
                 intakeJamTimer.milliseconds() >= IntakeConfig.INTAKE_JAM_DETECTION_DELAY_MS
@@ -274,5 +327,6 @@ internal class Intake(hardwareMap: HardwareMap) {
     }
 
     fun isUnjamming() = unjamming
+
 
 }

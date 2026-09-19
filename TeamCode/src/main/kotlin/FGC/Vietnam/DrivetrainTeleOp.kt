@@ -1,6 +1,6 @@
 package FGC.Vietnam
 
-import Climb
+import FGC.Vietnam.Hardware.Climb
 import RoadRunner.Drawing.drawRobot
 import android.graphics.Color
 import com.acmerobotics.dashboard.FtcDashboard
@@ -18,14 +18,12 @@ import FGC.Vietnam.Config.DrivetrainConfig
 import FGC.Vietnam.Config.FlywheelConfig
 import FGC.Vietnam.Config.IntakeConfig
 import FGC.Vietnam.Config.RoadRunnerConfig
-import FGC.Vietnam.DataLogger.TeleOpDatalogger
 import FGC.Vietnam.Utils.MotorTester
-import fgc.vietnam.robot01.Hardware.Drivetrain
-import fgc.vietnam.robot01.Hardware.Flywheel
-import fgc.vietnam.robot01.Hardware.Intake
-import fgc.vietnam.robot01.Hardware.IntakeSlidePosition
-import fgc.vietnam.robot01.Hardware.IntakeState
-import org.firstinspires.ftc.robotcore.external.navigation.TempUnit
+import FGC.Vietnam.Hardware.Drivetrain
+import FGC.Vietnam.Hardware.Flywheel
+import FGC.Vietnam.Hardware.Intake
+import FGC.Vietnam.Hardware.IntakeSlidePosition
+import FGC.Vietnam.Hardware.IntakeState
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -35,16 +33,17 @@ enum class Alliance {
     RED
 }
 
-abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : OpMode() {
+abstract class CompDriveTeleOp protected constructor(
+    var alliance: Alliance,
+    var transferDatalogOnly: Boolean = false
+) : OpMode() {
     private lateinit var drivetrain: Drivetrain
     private lateinit var flywheel: Flywheel
     private lateinit var intake: Intake
     private lateinit var climb: Climb
     private lateinit var lynxModules: List<LynxModule>
-    private val datalogger = TeleOpDatalogger()
 
     private var previousHeadingToggle = false
-    private var previousDatalogToggle = false
 
 
     private lateinit var dashboard: FtcDashboard
@@ -60,10 +59,6 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
     private var autoExtendTimer = ElapsedTime()
     private var warningActive = false
     private var autoExtending = true
-
-    lateinit var intakeTester: MotorTester
-    lateinit var leftFlywheelTester: MotorTester
-    lateinit var rightFlywheelTester: MotorTester
 
     lateinit var allHubs: List<LynxModule>
 
@@ -108,7 +103,7 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         allHubs = hardwareMap.getAll(LynxModule::class.java)
         lynxModules = allHubs
         for (module in allHubs) {
-            module.setBulkCachingMode(LynxModule.BulkCachingMode.AUTO)
+            module.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL)
         }
         val startingPose = when (alliance) {
             Alliance.BLUE -> Pose2d(
@@ -131,15 +126,6 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         homingTimer.reset()
         autoExtendTimer.reset()
 
-        intakeTester = MotorTester(intake.getHexMotor()).apply {
-            expectedDirection = intake.getHexMotor().direction
-        }
-        leftFlywheelTester = MotorTester(flywheel.getLeftShooterMotor()).apply {
-            expectedDirection = flywheel.getLeftShooterMotor().direction
-        }
-        rightFlywheelTester = MotorTester(flywheel.getRightShooterMotor()).apply {
-            expectedDirection = flywheel.getRightShooterMotor().direction
-        }
     }
 
     override fun init_loop() {
@@ -175,6 +161,7 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
     }
 
     override fun loop() {
+        allHubs.forEach { it.clearBulkCache() }
         val loopStartTime = getRuntime()
 
         packet = TelemetryPacket(false)
@@ -186,11 +173,8 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         }
         previousHeadingToggle = headingToggle
 
-        val combinedLeftStickY = gamepad1.left_stick_y.toDouble()
-        val combinedRightStickX = gamepad1.right_stick_x.toDouble()
-
-        val forwardInput = deadband(combinedLeftStickY).coerceIn(-1.0, 1.0)
-        val turnInput = deadband(combinedRightStickX).coerceIn(-1.0, 1.0)
+        val forwardInput = deadband(gamepad1.left_stick_y.toDouble()).coerceIn(-1.0, 1.0)
+        val turnInput = deadband(-gamepad1.right_stick_x.toDouble()).coerceIn(-1.0, 1.0)
 
         val drive = drivetrain.drive(forwardInput, turnInput, false, voltageSensor.voltage)
 
@@ -230,7 +214,6 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
                     2000
                 )
             }
-
         } else if (intake.getIntakeState() == IntakeState.OFF) {
             if (!gamepad1.isRumbling) {
                 gamepad1.runRumbleEffect(rumblePattern)
@@ -238,7 +221,6 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
             if (!gamepad2.isRumbling) {
                 gamepad2.runRumbleEffect(rumblePattern)
             }
-
         } else {
             if (gamepad1.isRumbling) {
                 gamepad1.stopRumble()
@@ -285,7 +267,7 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
             }
         }
 
-        val flywheelState = flywheel.update(voltageSensor.voltage)
+        flywheel.update(voltageSensor.voltage)
 
         intake.update()
 
@@ -302,6 +284,10 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
             climb.climbBackward(1.0)
         } else {
             climb.stop()
+        }
+
+        if (gamepad1.touchpadWasPressed()){
+            climb.climbHookOpen()
         }
 
         if (gamepad1.triangle || gamepad2.triangle){
@@ -382,139 +368,25 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         if (IntakeConfig.ENABLE_LIMIT_SWITCH_AND_MAGNETIC_TESTING){
             packet.put("Right Limit Switch is Pressed", intake.rightLimitSwitchIsPressed())
             packet.put("Left Limit Switch is Pressed", intake.leftLimitSwitchIsPressed())
-            packet.put("Right Magnetic Switch is Confirmed", intake.leftMagnetConfirmed())
-            packet.put("Left Magnetic Switch is Confirmed", intake.rightMagnetConfirmed())
+            packet.put("Both Limits Pressed (Home)", intake.bothLimitsPressed())
+            packet.put("Limit Sync State", intake.getLimitSyncState())
             packet.put("Right Magnetic Switch is Pressed", intake.rightMagnetRegistered())
             packet.put("Left Magnetic Switch is Pressed", intake.leftMagnetRegistered())
-            packet.put("Right Intake Slide State ", intake.getRightIntakeSlidePosition().name)
-            packet.put("Left Intake Slide State ", intake.getLeftIntakeSlidePosition().name)
+            packet.put("Both Magnets Detected (Extended)", intake.bothMagnetsRegistered())
+            packet.put("Magnet Sync State", intake.getMagnetSyncState())
+            packet.put("Right Magnetic Switch is Confirmed", intake.rightMagnetConfirmed())
+            packet.put("Left Magnetic Switch is Confirmed", intake.leftMagnetConfirmed())
+            packet.put("Both Magnets Confirmed", intake.bothMagnetsConfirmed())
+            packet.put("Right Intake Slide State", intake.getRightIntakeSlidePosition().name)
+            packet.put("Left Intake Slide State", intake.getLeftIntakeSlidePosition().name)
+            packet.put("Slides Synchronized", intake.areSlidesSynchronized())
+            packet.put("Slide Skew State", intake.getSlideSkewState())
             packet.put("Servo Right Below Power", intake.servoRightBelowPower)
-            packet.put("Servo Right Above Power", intake.servoRightAbovePower)
             packet.put("Servo Left Below Power", intake.servoLeftBelowPower)
-            packet.put("Servo Left Above Power", intake.servoLeftAbovePower)
         }
+
 
         dashboard.sendTelemetryPacket(packet)
-
-        if (drive != null) {
-            val datalogToggle = (gamepad1.start && gamepad1.y) || (gamepad2.start && gamepad2.y)
-            if (datalogToggle && !previousDatalogToggle) {
-                datalogger.toggleLogging()
-            }
-            previousDatalogToggle = datalogToggle
-
-            if (datalogger.isLogging) {
-                val hubTemps = lynxModules.map { hub ->
-                    try {
-                        hub.getTemperature(TempUnit.CELSIUS)
-                    } catch (e: Exception) {
-                        Double.NaN
-                    }
-                }
-                datalogger.writeRow(
-                    gamepad1 = gamepad1,
-                    gamepad2 = gamepad2,
-                    drive = drive,
-                    flywheel = flywheelState,
-                    intake = intake,
-                    hubTemperaturesCelsius = hubTemps,
-                )
-            }
-        }
-
-        if (flywheelState == null || drive == null || intake == null) return
-
-        telemetry.addData(
-            "Input",
-            "forward=%.2f→%.2f turn=%.2f hold=%s",
-            drive.requestedForward,
-            drive.limitedForward,
-            drive.requestedTurn,
-            if (drive.headingHoldEnabled) "ON" else "OFF",
-        )
-
-        telemetry.addData(
-            "Heading",
-            "now=%.1f° target=%.1f° error=%+.2f° rate=%+.1f°/s",
-            drive.heading,
-            drive.targetHeading,
-            drive.headingError,
-            drive.yawRate,
-        )
-        telemetry.addData(
-            "Heading PID",
-            "P=%+.3f I=%+.3f D=%+.3f total=%+.3f",
-            drive.proportionalCorrection,
-            drive.integralCorrection,
-            drive.derivativeCorrection,
-            drive.headingCorrection,
-        )
-        telemetry.addData(
-            "Velocity",
-            "L=%.0f/%.0f R=%.0f/%.0f ticks/s",
-            drive.leftActualVelocity,
-            drive.leftTargetVelocity,
-            drive.rightActualVelocity,
-            drive.rightTargetVelocity,
-        )
-        telemetry.addData(
-            "Drive current",
-            "L=%.2f A R=%.2f A total=%.2f A",
-            drive.leftCurrentAmps,
-            drive.rightCurrentAmps,
-            drive.leftCurrentAmps + drive.rightCurrentAmps,
-        )
-        telemetry.addData(
-            "Robot",
-            "speed=%.0f mm/s battery=%.2f V gear=%.1f:1",
-            drive.linearSpeedMmPerSecond,
-            drive.batteryVoltage,
-            DrivetrainConfig.GEAR_REDUCTION,
-        )
-        telemetry.addData(
-            "Flywheel",
-            "%s %s shaft=%.0f/%.0f rpm difference=%.0f",
-            if (flywheelState.enabled) "ON" else "OFF",
-            if (flywheelState.atSpeed) "READY" else "—",
-            flywheelState.shaftRpm,
-            flywheelState.targetRpm,
-            flywheelState.rpmDifference,
-        )
-        telemetry.addData(
-            "Flywheel M2",
-            "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
-            flywheelState.leftShooterMotor.rpm,
-            flywheelState.leftShooterMotor.velocity,
-            flywheelState.targetVelocity,
-            flywheelState.leftShooterMotor.currentAmps,
-        )
-        telemetry.addData(
-            "Flywheel M3",
-            "rpm=%.0f velocity=%.0f/%.0f ticks/s current=%.2f A",
-            flywheelState.rightShooterMotor.rpm,
-            flywheelState.rightShooterMotor.velocity,
-            flywheelState.targetVelocity,
-            flywheelState.rightShooterMotor.currentAmps,
-        )
-
-        telemetry.addData(
-            "Intake",
-            "state=%s hex=%s",
-            intake.getIntakeState(),
-        )
-
-        telemetry.addData(
-            "Datalog",
-            "%s rows=%d",
-            if (datalogger.isLogging) "● REC" else "○ off",
-            datalogger.rowCount,
-        )
-
-        telemetry.addData(
-            "Flywheel wheel",
-            "rim=%.1f m/s",
-            flywheelState.surfaceSpeedMetersPerSecond,
-        )
     }
 
     override fun stop() {
@@ -522,7 +394,6 @@ abstract class CompDriveTeleOp protected constructor(var alliance: Alliance) : O
         flywheel.stop()
         intake.stopMotor()
         intake.stopServos()
-        datalogger.stopLogging()
     }
 
     private fun deadband(value: Double): Double =

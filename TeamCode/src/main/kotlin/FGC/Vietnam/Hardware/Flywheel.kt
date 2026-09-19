@@ -1,4 +1,4 @@
-package fgc.vietnam.robot01.Hardware
+package FGC.Vietnam.Hardware
 
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
@@ -65,14 +65,6 @@ internal class Flywheel(hardwareMap: HardwareMap) {
         enabled = !enabled
     }
 
-    fun enable() {
-        enabled = true
-    }
-
-    fun disable() {
-        enabled = false
-    }
-
 
     val shooterPIDF = PIDFController(
         kP = PIDF_P,
@@ -81,7 +73,7 @@ internal class Flywheel(hardwareMap: HardwareMap) {
         FeedForward(FF_KS, FF_KV)
     )
 
-    fun update(batteryVoltage: Double): FlywheelTelemetry? {
+    fun update(batteryVoltage: Double) {
         if (enabled) {
             val now = System.currentTimeMillis() / 1000.0
             targetVelocity = FlywheelConfig.DEFAULT_RPM
@@ -151,47 +143,11 @@ internal class Flywheel(hardwareMap: HardwareMap) {
             leftShooterMotor.power = output * voltageNorm
             rightShooterMotor.power = output * voltageNorm
 
-
-            if (DATALOG_ENABLED) {
-                val leftState = motorTelemetry(leftShooterMotor)
-                val rightState = motorTelemetry(rightShooterMotor)
-
-                val shaftRpm =
-                    (leftState.rpm + rightState.rpm) / 2.0
-
-                val allowedErrorRpm = maxOf(
-                    FlywheelConfig.MIN_READY_ERROR_RPM,
-                    targetVelocity * FlywheelConfig.READY_ERROR_RATIO
-                )
-
-                return FlywheelTelemetry(
-                    enabled = true,
-                    atSpeed =
-                        abs(leftState.rpm - targetVelocity) <= allowedErrorRpm &&
-                                abs(rightState.rpm - targetVelocity) <= allowedErrorRpm,
-
-                    targetRpm = targetVelocity,
-                    targetVelocity = FlywheelConfig.rpmToTicksPerSecond(targetVelocity),
-
-                    leftShooterMotor = leftState,
-                    rightShooterMotor = rightState,
-
-                    shaftRpm = shaftRpm,
-                    rpmDifference = abs(leftState.rpm - rightState.rpm),
-
-                    surfaceSpeedMetersPerSecond =
-                        FlywheelConfig.rpmToSurfaceSpeedMetersPerSecond(shaftRpm)
-                )
-            } else return null;
-
-
-
         } else {
             leftShooterMotor.velocity = 0.0
             rightShooterMotor.velocity = 0.0
             leftShooterMotor.power = 0.0
             rightShooterMotor.power = 0.0
-            return null;
         }
 
     }
@@ -202,14 +158,6 @@ internal class Flywheel(hardwareMap: HardwareMap) {
         rightShooterMotor.velocity = 0.0
     }
 
-    private fun motorTelemetry(motor: DcMotorEx): FlywheelMotorTelemetry =
-        FlywheelMotorTelemetry(
-            rpm = FlywheelConfig.ticksPerSecondToRpm(motor.velocity),
-            velocity = motor.velocity,
-            currentAmps = motor.getCurrent(CurrentUnit.AMPS),
-            encoderPosition = motor.currentPosition,
-            motorPower = motor.power,
-        )
 
     private fun motor(
         hardwareMap: HardwareMap,

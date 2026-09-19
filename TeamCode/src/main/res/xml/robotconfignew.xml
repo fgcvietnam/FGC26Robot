@@ -13,8 +13,8 @@
 
             <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
 
-            <ContinuousRotationServo name="leftBelowIntakeServo" port="0"/>
-            <ContinuousRotationServo name="leftAboveIntakeServo" port="2"/>
+            <ContinuousRotationServo name="leftIntakeServo" port="0"/>
+            <Servo name="hookServo" port="2"/>
             <ContinuousRotationServo name="climbServo" port="4"/>
 
 
@@ -28,7 +28,7 @@
 
 
 
-            <!--            <RevColorSensorV3 name="intakeColorSensor" port="0" bus="1"/>-->
+<!--                        <RevColorSensorV3 name="intakeColorSensor" port="0" bus="1"/>-->
 
 
         </LynxModule>
@@ -39,8 +39,7 @@
             <RevRoboticsUltraplanetaryHDHexMotor name="rightShooterMotor" port="2" />
             <RevRoboticsUltraplanetaryHDHexMotor name="driveLeft" port="3" />
 
-            <ContinuousRotationServo name="rightBelowIntakeServo" port="0"/>
-            <ContinuousRotationServo name="rightAboveIntakeServo" port="2"/>
+            <ContinuousRotationServo name="rightIntakeServo" port="0"/>
 
             <RevTouchSensor name="rightLimitSwitchExtension" port="1" />
 
