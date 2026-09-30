@@ -35,7 +35,6 @@ enum class Alliance {
 
 abstract class CompDriveTeleOp protected constructor(
     var alliance: Alliance,
-    var transferDatalogOnly: Boolean = false
 ) : OpMode() {
     private lateinit var drivetrain: Drivetrain
     private lateinit var flywheel: Flywheel
@@ -54,15 +53,11 @@ abstract class CompDriveTeleOp protected constructor(
     private lateinit var voltageSensor: VoltageSensor
 
     private val homingTimer = ElapsedTime()
-
-    private var motorTestTimer = ElapsedTime()
     private var autoExtendTimer = ElapsedTime()
     private var warningActive = false
     private var autoExtending = true
 
     lateinit var allHubs: List<LynxModule>
-
-    var testState = 0
 
     private val okPattern = listOf(
         Blinker.Step(Color.GREEN, 1, TimeUnit.SECONDS)
@@ -192,7 +187,10 @@ abstract class CompDriveTeleOp protected constructor(
         }
 
         when {
-            isTransferring -> intake.transfer(flywheel.atTargetVelocity())
+            isTransferring -> {
+                intake.transfer(flywheel.atTargetVelocity())
+                intake.moveServosBackward()
+            }
             isOuttaking -> intake.outtake()
             intake.getIntakeState() == IntakeState.OFF -> intake.stopMotor()
             else -> intake.intake()

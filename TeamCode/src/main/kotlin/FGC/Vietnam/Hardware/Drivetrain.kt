@@ -215,14 +215,6 @@ internal class Drivetrain(private val hardwareMap: HardwareMap) {
         }
     }
 
-    private fun startHeadingCorrectionTimer() {
-        headingCorrectionStartTime = if (DrivetrainConfig.DPAD_ORIENTATION_TIMEOUT_SECONDS > 0) {
-            System.currentTimeMillis() / 1000.0
-        } else {
-            -1.0
-        }
-    }
-
     private fun isHeadingCorrectionTimedOut(currentTime: Double): Boolean {
         if (DrivetrainConfig.DPAD_ORIENTATION_TIMEOUT_SECONDS <= 0 || headingCorrectionStartTime <= 0) return false
         return (currentTime - headingCorrectionStartTime) > DrivetrainConfig.DPAD_ORIENTATION_TIMEOUT_SECONDS

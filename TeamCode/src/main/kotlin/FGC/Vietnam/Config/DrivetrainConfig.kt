@@ -14,8 +14,6 @@ internal object DrivetrainConfig {
 
     val encoderTicksPerWheelRevolution = MOTOR_ENCODER_TICKS_PER_REVOLUTION * GEAR_REDUCTION
     val millimetersPerEncoderTick = PI * WHEEL_DIAMETER_MM / encoderTicksPerWheelRevolution
-    // Drive shaping and limits
-    @JvmField var DATALOG_ENABLED = false
     @JvmField var FORWARD_DEADBAND = 0.05
     @JvmField var FORWARD_EXPO = 0.20
     @JvmField var TURN_DEADBAND = 0.05
