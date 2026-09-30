@@ -187,10 +187,7 @@ abstract class CompDriveTeleOp protected constructor(
         }
 
         when {
-            isTransferring -> {
-                intake.transfer(flywheel.atTargetVelocity())
-                intake.moveServosBackward()
-            }
+            isTransferring -> intake.transfer(flywheel.atTargetVelocity())
             isOuttaking -> intake.outtake()
             intake.getIntakeState() == IntakeState.OFF -> intake.stopMotor()
             else -> intake.intake()
@@ -232,19 +229,11 @@ abstract class CompDriveTeleOp protected constructor(
             val rightPosition = intake.getRightIntakeSlidePosition()
             val leftPosition = intake.getLeftIntakeSlidePosition()
 
-            val bothHome =
-                rightPosition == IntakeSlidePosition.HOME &&
-                        leftPosition == IntakeSlidePosition.HOME
-
-            val bothExtending =
-                rightPosition == IntakeSlidePosition.EXTENDING &&
-                        leftPosition == IntakeSlidePosition.EXTENDING
-
             val bothExtended =
                 rightPosition == IntakeSlidePosition.EXTENDED &&
                         leftPosition == IntakeSlidePosition.EXTENDED
 
-            if (bothHome || bothExtending) {
+            if (!bothExtended) {
                 intake.moveServosForward()
             }
 
@@ -255,7 +244,7 @@ abstract class CompDriveTeleOp protected constructor(
                 autoExtending = false
             }
         } else {
-            val servoBwd = gamepad1.dpad_down || gamepad2.dpad_down
+            val servoBwd = gamepad1.dpad_down || gamepad2.dpad_down || (gamepad1.right_bumper || gamepad2.right_bumper) && flywheel.atTargetVelocity()
             val servoFwd = gamepad1.dpad_up || gamepad2.dpad_up
 
             when {

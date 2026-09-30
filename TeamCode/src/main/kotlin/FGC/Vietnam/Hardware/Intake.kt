@@ -75,7 +75,7 @@ internal class Intake(hardwareMap: HardwareMap) {
 
     private val rightMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "rightMagneticSwitchExtension")
     private val leftMagneticSwitch = hardwareMap.get(RevTouchSensor::class.java, "leftMagneticSwitchExtension")
-    private var state: IntakeState = IntakeState.OFF
+    private var state: IntakeState = IntakeState.INTAKE
 
     val motorPower: Double get() = motor.power
     val hexMotorPower: Double get() = hexMotor.power
