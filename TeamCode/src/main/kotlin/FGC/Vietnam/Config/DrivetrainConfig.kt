@@ -43,7 +43,7 @@ internal object DrivetrainConfig {
     @JvmField var ACTIVE_HEADING_KI = 0.15
     @JvmField var ACTIVE_HEADING_KD = 0.55
     @JvmField var ACTIVE_HEADING_KS = 0.02
-    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 0.0
+    @JvmField var ACTIVE_HEADING_HOLD_DEADBAND_DEG = 1
     @JvmField var ACTIVE_HEADING_TURN_DEADBAND = 0.05
     @JvmField var ACTIVE_HEADING_SETTLE_TIME_SECONDS = 0.15
     @JvmField var MAX_TILT_FOR_HEADING_CORRECTION_DEG = 15.0

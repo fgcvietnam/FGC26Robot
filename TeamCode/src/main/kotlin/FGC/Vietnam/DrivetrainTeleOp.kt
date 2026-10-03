@@ -169,7 +169,7 @@ abstract class CompDriveTeleOp protected constructor(
         previousHeadingToggle = headingToggle
 
         val forwardInput = deadband(gamepad1.left_stick_y.toDouble()).coerceIn(-1.0, 1.0)
-        val turnInput = deadband(-gamepad1.right_stick_x.toDouble()).coerceIn(-1.0, 1.0)
+        val turnInput = deadband(gamepad1.right_stick_x.toDouble()).coerceIn(-1.0, 1.0)
 
         val drive = drivetrain.drive(forwardInput, turnInput, false, voltageSensor.voltage)
 
