@@ -7,7 +7,7 @@ import kotlin.math.PI
 internal object FlywheelConfig {
     const val LEFT_SHOOTER_MOTOR = "leftShooterMotor"
     const val RIGHT_SHOOTER_MOTOR = "rightShooterMotor"
-    @JvmField var DEFAULT_RPM = 1400.0
+    @JvmField var DEFAULT_RPM = 1200.0
     @JvmField var PIDF_P = 0.001
     @JvmField var PIDF_I = 0.0
     @JvmField var PIDF_D = 0.00001

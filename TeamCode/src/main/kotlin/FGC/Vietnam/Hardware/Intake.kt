@@ -190,7 +190,17 @@ internal class Intake(hardwareMap: HardwareMap) {
     }
 
 
-    fun moveServosForward() {
+    fun isFullyExtended(): Boolean {
+        val leftReached = leftMagneticSwitch.isPressed || leftMagnetConfirmed()
+        val rightReached = rightMagneticSwitch.isPressed || rightMagnetConfirmed()
+        return leftReached && rightReached
+    }
+
+    fun isFullyRetracted(): Boolean {
+        return leftLimitSwitch.isPressed && rightLimitSwitch.isPressed
+    }
+
+    fun extendIntake() {
         val rightReached = rightMagneticSwitch.isPressed || rightMagnetConfirmed()
         if (rightReached) {
             servoRightBelow.power = 0.0
@@ -210,17 +220,7 @@ internal class Intake(hardwareMap: HardwareMap) {
         }
     }
 
-    fun isFullyExtended(): Boolean {
-        val leftReached = leftMagneticSwitch.isPressed || leftMagnetConfirmed()
-        val rightReached = rightMagneticSwitch.isPressed || rightMagnetConfirmed()
-        return leftReached && rightReached
-    }
-
-    fun isFullyRetracted(): Boolean {
-        return leftLimitSwitch.isPressed && rightLimitSwitch.isPressed
-    }
-
-    fun moveServosBackward() {
+    fun retractIntake() {
         if (rightLimitSwitch.isPressed) {
             servoRightBelow.power = 0.0
             rightIntakeSlidePosition = IntakeSlidePosition.HOME

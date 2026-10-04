@@ -18,6 +18,8 @@ object ClimbConfig {
     @JvmField var HOLD_POWER_INCREASE_PER_SECOND = 0.05;
 
     @JvmField var MAX_HOLD_POWER = 0.5;
+    @JvmField var ENABLE_AUTO_EXTENDING = true;
+    @JvmField var AUTO_EXTEND_TIME_SECONDS = 5.0;
 
     @JvmField var CLIMB_DEBUG = false;
 }

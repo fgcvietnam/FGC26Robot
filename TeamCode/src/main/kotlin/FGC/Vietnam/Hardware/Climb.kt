@@ -84,7 +84,7 @@ internal class Climb(hardwareMap: HardwareMap) {
 
     fun climbExtend(){
         if (servoClimb.power == 1.0) return
-        if (distanceSensor.getDistance(DistanceUnit.MM) > ClimbConfig.CLIMB_EXTEND_DISTANCE_MM) climbExtendStop()
+//        if (distanceSensor.getDistance(DistanceUnit.MM) > ClimbConfig.CLIMB_EXTEND_DISTANCE_MM) climbExtendStop()
         servoClimb.power = 1.0
     }
 

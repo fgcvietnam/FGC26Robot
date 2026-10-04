@@ -35,7 +35,7 @@ internal object DrivetrainConfig {
     @JvmField var MOTOR_POWER_TOLERANCE = 0.01
 
     // Active Heading Correction
-    @JvmField var ENABLE_ACTIVE_HEADING_TUNING = false
+    @JvmField var ENABLE_ACTIVE_HEADING_TUNING = true
     @JvmField var ENABLE_ACTIVE_HEADING_CORRECTION = false
 
     @JvmField var LOCALIZER_ENABLE = true

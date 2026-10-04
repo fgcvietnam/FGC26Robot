@@ -18,7 +18,6 @@ import FGC.Vietnam.Config.DrivetrainConfig
 import FGC.Vietnam.Config.FlywheelConfig
 import FGC.Vietnam.Config.IntakeConfig
 import FGC.Vietnam.Config.RoadRunnerConfig
-import FGC.Vietnam.Utils.MotorTester
 import FGC.Vietnam.Hardware.Drivetrain
 import FGC.Vietnam.Hardware.Flywheel
 import FGC.Vietnam.Hardware.Intake
@@ -53,9 +52,11 @@ abstract class CompDriveTeleOp protected constructor(
     private lateinit var voltageSensor: VoltageSensor
 
     private val homingTimer = ElapsedTime()
-    private var autoExtendTimer = ElapsedTime()
+    private var intakeAutoExtendTimer = ElapsedTime()
+    private var climbAutoExtendTimer = ElapsedTime()
     private var warningActive = false
-    private var autoExtending = true
+    private var intakeAutoExtending = true
+    private var climbAutoExtending = true
 
     lateinit var allHubs: List<LynxModule>
 
@@ -119,8 +120,6 @@ abstract class CompDriveTeleOp protected constructor(
         drivetrain.setPose(startingPose)
 
         homingTimer.reset()
-        autoExtendTimer.reset()
-
     }
 
     override fun init_loop() {
@@ -133,7 +132,7 @@ abstract class CompDriveTeleOp protected constructor(
                     telemetry.addLine("⚠️❌ Intake Homing Timed Out ❌⚠️")
                     warningActive = true
                 } else {
-                    intake.moveServosBackward()
+                    intake.retractIntake()
                 }
             } else {
                 intake.stopServos()
@@ -150,8 +149,10 @@ abstract class CompDriveTeleOp protected constructor(
     }
 
     override fun start() {
-        autoExtending = true
-        autoExtendTimer.reset()
+        intakeAutoExtending = true
+        intakeAutoExtendTimer.reset()
+        climbAutoExtending = true
+        climbAutoExtendTimer.reset()
         drivetrain.imu.resetYaw()
     }
 
@@ -225,7 +226,12 @@ abstract class CompDriveTeleOp protected constructor(
             }
         }
 
-        if (autoExtending && IntakeConfig.ENABLE_AUTO_EXTENDING) {
+        if (gamepad1.dpadRightWasPressed() || gamepad2.dpadRightWasPressed()) {
+            intakeAutoExtending = true
+            intakeAutoExtendTimer.reset()
+        }
+
+        if (intakeAutoExtending && IntakeConfig.ENABLE_AUTO_EXTENDING) {
             val rightPosition = intake.getRightIntakeSlidePosition()
             val leftPosition = intake.getLeftIntakeSlidePosition()
 
@@ -234,22 +240,22 @@ abstract class CompDriveTeleOp protected constructor(
                         leftPosition == IntakeSlidePosition.EXTENDED
 
             if (!bothExtended) {
-                intake.moveServosForward()
+                intake.extendIntake()
             }
 
-            if (autoExtendTimer.seconds() >= IntakeConfig.AUTO_EXTEND_TIME_SECONDS ||
+            if (intakeAutoExtendTimer.seconds() >= IntakeConfig.AUTO_EXTEND_TIME_SECONDS ||
                 bothExtended
             ) {
                 intake.stopServos()
-                autoExtending = false
+                intakeAutoExtending = false
             }
         } else {
             val servoBwd = gamepad1.dpad_down || gamepad2.dpad_down || (gamepad1.right_bumper || gamepad2.right_bumper) && flywheel.atTargetVelocity()
             val servoFwd = gamepad1.dpad_up || gamepad2.dpad_up
 
             when {
-                servoBwd -> intake.moveServosBackward()
-                servoFwd -> intake.moveServosForward()
+                servoBwd -> intake.retractIntake()
+                servoFwd -> intake.extendIntake()
                 else -> intake.stopServos()
             }
         }
@@ -279,8 +285,13 @@ abstract class CompDriveTeleOp protected constructor(
 
         if (gamepad1.triangle || gamepad2.triangle){
             climb.climbExtend()
-        } else if ((gamepad1.triangle && gamepad1.touchpad) || (gamepad2.triangle && gamepad2.touchpad)) {
-            climb.climbRetract()
+        } else if (climbAutoExtending && ClimbConfig.ENABLE_AUTO_EXTENDING){
+            if (climbAutoExtendTimer.seconds() >= ClimbConfig.AUTO_EXTEND_TIME_SECONDS) {
+                climbAutoExtending = false
+                climb.climbExtendStop()
+            } else {
+                climb.climbExtend()
+            }
         } else {
             climb.climbExtendStop()
         }
