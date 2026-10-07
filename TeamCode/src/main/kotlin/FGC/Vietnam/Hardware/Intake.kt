@@ -107,11 +107,12 @@ internal class Intake(hardwareMap: HardwareMap) {
     }
 
     fun transfer(shooterReady: Boolean) {
-        if (shooterReady) {
-            hexMotor.power = 1.0
-        } else {
-            hexMotor.power = 0.0
-        }
+//        if (shooterReady) {
+//            hexMotor.power = 1.0
+//        } else {
+//            hexMotor.power = 0.0
+//        }
+        hexMotor.power = 1.0
         state = IntakeState.TRANSFER
     }
 

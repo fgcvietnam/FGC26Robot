@@ -250,7 +250,7 @@ abstract class CompDriveTeleOp protected constructor(
                 intakeAutoExtending = false
             }
         } else {
-            val servoBwd = gamepad1.dpad_down || gamepad2.dpad_down || (gamepad1.right_bumper || gamepad2.right_bumper) && flywheel.atTargetVelocity()
+            val servoBwd = gamepad1.dpad_down || gamepad2.dpad_down || (gamepad1.right_bumper || gamepad2.right_bumper)
             val servoFwd = gamepad1.dpad_up || gamepad2.dpad_up
 
             when {
